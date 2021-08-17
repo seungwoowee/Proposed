@@ -1,10 +1,10 @@
 #### general settings
-name: Corrupted_noise
+name: DRB_SR_6e5
 use_tb_logger: true
 model: DRB
 distortion: sr
 scale: 4
-gpu_ids: [4]
+gpu_ids: [0,1]
 
 #### datasets
 datasets:
@@ -13,23 +13,26 @@ datasets:
     mode: DRB
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
-    dataroot_GT: D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR
-    dataroot_LR: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR
+    dataroot_GT: ../../../datasets/REDS_sep/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
+    dataroot_LR: ../../../datasets/REDS_sep/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
     n_workers: 6  # per GPU
-    batch_size: 16
-    GT_size: 128
+    batch_size: 8
+    GT_size: 256
     use_flip: true
     use_rot: true
     color: RGB
     data_type: seq
     position: mid # side_1st // side 2nd // mid
     ref_frame_num: 5 # 3 / 5 / 7 ...
-#  val:
-#    name: val
-#    mode: LQGT
-#    dataroot_GT: ../../../ntire20/DIV2K_valid_HR
-#    dataroot_LQ: ../../../ntire20/Corrupted-va-x
+  val:
+    name: val
+    mode: DRB
+    dataroot_GT: ../../../datasets/REDS_sep/val_sharp/ #../../../ntire20/DIV2K_valid_HR
+    dataroot_LR: ../../../datasets/REDS_sep/val_sharp_bicubic/X4/ # ../../../ntire20/Corrupted-va-x
+    data_type: seq
+    position: mid # side_1st // side 2nd // mid
+    ref_frame_num: 5 # 3 / 5 / 7 ...
 
 #### network structures
 network_G:
@@ -71,9 +74,9 @@ train:
 
   lr_scheme: MultiStepLR
 
-  niter: 60001
+  niter: 600001
   warmup_iter: -1  # no warm up
-  lr_steps: [5000, 10000, 20000, 30000]
+  lr_steps: [50000, 100000, 200000, 300000]
   lr_gamma: 0.5
 
   pixel_criterion: l1

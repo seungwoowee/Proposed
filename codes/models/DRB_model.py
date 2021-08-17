@@ -146,7 +146,7 @@ class DRBModel(BaseModel):
 
     def get_current_visuals(self, need_GT=True):
         out_dict = OrderedDict()
-        out_dict['LR'] = self.LR_data.detach()[0].float().cpu()
+        out_dict['LR'] = self.LR_data[len(self.LR_data)//2].detach()[0].float().cpu()
         out_dict['SR'] = self.SR_data.detach()[0].float().cpu()
         if need_GT:
             out_dict['GT'] = self.GT_data.detach()[0].float().cpu()
