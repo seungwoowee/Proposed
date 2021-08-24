@@ -8,6 +8,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from data.data_sampler import DistIterSampler
 
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import options.options as option
 from utils import util
 from data import create_dataloader, create_dataset
@@ -214,7 +215,6 @@ def main():
                     cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
 
-
                 avg_psnr = avg_psnr / idx
                 val_pix_err_f /= idx
                 val_pix_err_nf /= idx
@@ -253,7 +253,6 @@ def main():
                     # resume_model.resume_training(resume_state)  # handle optimizers and schedulers
                     # logger.info('{}.'.format(resume_model.optimizers[0].param_groups[0]['params'][0].shape ==
                     #                          model.optimizers[0].param_groups[0]['params'][0].shape))
-
 
     if rank <= 0:
         logger.info('Saving the final model.')
