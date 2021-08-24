@@ -137,7 +137,7 @@ class DRBNet_mid(nn.Module):
         use_bn = False
 
         res_scale = 0.1
-        block_n = 2
+        block_n = 4
 
         ch = 64
         ch_reduction = 16

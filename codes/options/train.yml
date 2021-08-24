@@ -16,7 +16,7 @@ datasets:
     dataroot_GT: ../../../datasets/REDS_sep/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
     dataroot_LR: ../../../datasets/REDS_sep/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
-    n_workers: 6  # per GPU
+    n_workers: 0  # per GPU
     batch_size: 8
     GT_size: 256
     use_flip: true
@@ -67,7 +67,7 @@ train:
   beta1_D: 0.9
   beta2_D: 0.999
 
-  lr_DRB: !!float 1e-4
+  lr_DRB: !!float 1e-5
   weight_decay_DRB: 0
   beta1_DRB: 0.9
   beta2_DRB: 0.999
