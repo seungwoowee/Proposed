@@ -1,59 +1,6 @@
-# import sys
-# sys.path.append('models\modules\GMA_core')
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import argparse
-import os
-from codes.utils import util
-from codes.data.util import read_img
-
-from models.modules.GMA_core.GMA_network import RAFTGMA
-from models.modules.GMA_core.GMA_utils.utils import InputPadder
-
-import numpy as np
-from PIL import Image
-import cv2
-
-import torchvision.transforms as transforms
-
-
-def load_image(path):
-    img = np.array(Image.open(path)).astype(np.uint8)
-    img = torch.from_numpy(img).permute(2, 0, 1).float()
-
-    return img[None].to('cuda')
-
-
-def show_PIL_image(imgs):
-    tf = transforms.ToPILImage()
-
-    dst = Image.new('RGB', (imgs.shape[-1], imgs.shape[-2] * len(imgs)))
-    dst.paste(tf(imgs.detach()[0].float().cpu()), (0, 0))
-    # dst.show()
-    for i in range(len(imgs) - 1):
-        img = tf(imgs.detach()[i + 1].float().cpu())
-        dst.paste(img, (0, img.height * (i + 1)))
-        print(img.height)
-
-    return dst
-
-
-flow_parser = argparse.ArgumentParser()
-flow_parser.add_argument('--model', help="restore checkpoint",
-                         default="models/modules/GMA_checkpoints/gma-kitti.pth")
-flow_parser.add_argument('--model_name', help="define model name", default="GMA")
-flow_parser.add_argument('--path', help="dataset for evaluation",
-                         default="models/modules/GMA_imgs")
-flow_parser.add_argument('--num_heads', default=1, type=int,
-                         help='number of heads in attention and aggregation')
-flow_parser.add_argument('--position_only', default=False, action='store_true',
-                         help='only use position-wise attention')
-flow_parser.add_argument('--position_and_content', default=False, action='store_true',
-                         help='use position and content-wise attention')
-flow_parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
-flow_args = flow_parser.parse_args()
 
 
 class ResModule(nn.Module):
@@ -190,7 +137,7 @@ class DRBNet_mid(nn.Module):
         use_bn = False
 
         res_scale = 0.1
-        block_n = 2
+        block_n = 4
 
         ch = 64
         ch_reduction = 16
@@ -238,71 +185,7 @@ class DRBNet_mid(nn.Module):
 
         self.initialize_weights()
 
-        self.GMA_model = torch.nn.DataParallel(RAFTGMA(flow_args))
-        self.GMA_model.load_state_dict(torch.load(flow_args.model))
-        self.GMA_model = self.GMA_model.module
-        self.GMA_model.to('cuda')
-        self.GMA_model.eval()
-        # print(f"Loaded checkpoint at {flow_args.model}")
-
     def forward(self, x):
-        path = 'D:/REDS/ori.png'
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        img = img.astype(np.float32) / 255.
-        img = img[:, :, [2, 1, 0]]
-        img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float()
-        img = img[None].to('cuda') * 255
-        # image1 = img[:, :, 73:73 + 64, 16:16 + 64]
-        # image1 = x[0][0:8, :, :, :]
-        image1 = x[0]
-
-        path = 'D:/REDS/ori_3.png'
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        img = img.astype(np.float32) / 255.
-        img = img[:, :, [2, 1, 0]]
-        img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float()
-        img = img[None].to('cuda') * 255
-        # image2 = img[:, :, 73:73 + 64, 16:16 + 64]
-        # image2 = x[2][0:8, :, :, :]
-        image2 = x[2]
-
-        padder = InputPadder(image1.shape)
-        image1, image2 = padder.pad(image1, image2)
-        flow_low, flow_up = self.GMA_model(image1, image2, iters=12, test_mode=True)
-
-        ####
-        W, H = image1.shape[-1], image1.shape[-2]
-        gridX, gridY = np.meshgrid(np.arange(W), np.arange(H))
-
-        self.gridX = torch.tensor(gridX, requires_grad=False, device='cuda')
-        self.gridY = torch.tensor(gridY, requires_grad=False, device='cuda')
-
-        u = flow_up[:, 0, :, :]
-        v = flow_up[:, 1, :, :]
-        grid_x = self.gridX.unsqueeze(0).expand_as(u).float() + u
-        grid_y = self.gridY.unsqueeze(0).expand_as(v).float() + v
-        # grid_x = torch.clamp(grid_x, min=-W, max=W)
-        # grid_y = torch.clamp(grid_y, min=-H, max=H)
-        # range -1 to 1
-        grid_x = 2 * (grid_x / W - 0.5)
-        grid_y = 2 * (grid_y / H - 0.5)
-
-        # stacking X and Y
-        grid = torch.stack((grid_x, grid_y), dim=3)
-        # Sample pixels using bilinear interpolation.
-        warped_images = torch.nn.functional.grid_sample(image1, grid)
-
-        show_PIL_image(warped_images[:, [2, 1, 0], :, :]).show()
-
-        _, flow_tmp = self.GMA_model(x[0], x[2], iters=12, test_mode=True)
-        flow.append(flow_tmp)
-        _, flow_tmp = self.GMA_model(x[1], x[2], iters=12, test_mode=True)
-        flow.append(flow_tmp)
-        _, flow_tmp = self.GMA_model(x[3], x[2], iters=12, test_mode=True)
-        flow.append(flow_tmp)
-        _, flow_tmp = self.GMA_model(x[4], x[2], iters=12, test_mode=True)
-        flow.append(flow_tmp)
-
         x1 = torch.cat((x[0], x[1], x[2]), 1)
         x2 = torch.cat((x[1], x[2], x[3]), 1)
         x3 = torch.cat((x[2], x[3], x[4]), 1)
