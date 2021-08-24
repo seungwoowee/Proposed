@@ -4,7 +4,7 @@ use_tb_logger: true
 model: DRB
 distortion: sr
 scale: 4
-gpu_ids: [4]
+gpu_ids: [0]
 
 #### datasets
 datasets:
@@ -14,10 +14,10 @@ datasets:
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
     dataroot_GT: C:/Users/wee/Pytorch_Projects/Proposed/dataset/train/GT # D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR
-    dataroot_LR: C:/Users/wee/Pytorch_Projects/Proposed/dataset/X4 #D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR
+    dataroot_LR: C:/Users/wee/Pytorch_Projects/Proposed/dataset/train/X4 #D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 2
+    batch_size: 16
     GT_size: 256
     use_flip: true
     use_rot: false
@@ -54,7 +54,7 @@ path:
   pretrain_model_DRB: ~
   pretrain_model_Flow: ../pretrained_model/gma-sintel.pth
   strict_load: true
-  resume_state: ../experiments/DRB_SR/training_state/60000.state
+  resume_state: ~
 
 #### training settings: learning rate scheme, loss
 train:
