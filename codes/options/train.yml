@@ -10,17 +10,17 @@ gpu_ids: [4]
 datasets:
   train:
     name: train
-    mode: DRB
+    mode: DRB_no_patch
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
     dataroot_GT: C:/Users/wee/Pytorch_Projects/Proposed/dataset/train/GT # D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR
     dataroot_LR: C:/Users/wee/Pytorch_Projects/Proposed/dataset/X4 #D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
-    n_workers: 6  # per GPU
-    batch_size: 16
-    GT_size: 128
+    n_workers: 0  # per GPU
+    batch_size: 2
+    GT_size: 256
     use_flip: true
-    use_rot: true
+    use_rot: false
     color: RGB
     data_type: seq
     position: mid # side_1st // side 2nd // mid
