@@ -8,7 +8,6 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from data.data_sampler import DistIterSampler
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import options.options as option
 from utils import util
 from data import create_dataloader, create_dataset
