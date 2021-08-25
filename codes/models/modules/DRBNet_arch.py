@@ -39,9 +39,39 @@ def show_PIL_image(imgs):
     return dst
 
 
+def flow_cal_backwarp(src_img, dst_img, model):
+    padder = InputPadder(src_img.shape)
+    src_img, dst_img = padder.pad(src_img, dst_img)
+    _, flow = model(src_img, dst_img, iters=12, test_mode=True)
+    out = backwarp(padder.unpad(dst_img), padder.unpad(flow))
+    return out
+
+
+def backwarp(img, flow):
+    _, _, H, W = img.size()
+
+    u = flow[:, 0, :, :]
+    v = flow[:, 1, :, :]
+
+    gridW, gridH = np.meshgrid(np.arange(W), np.arange(H))
+
+    gridW = torch.tensor(gridW, requires_grad=False, device=torch.device('cuda'))
+    gridH = torch.tensor(gridH, requires_grad=False, device=torch.device('cuda'))
+    x = gridW.unsqueeze(0).expand_as(u).float() + u
+    y = gridH.unsqueeze(0).expand_as(v).float() + v
+    # range -1 to 1
+    x = 2 * (x / W - 0.5)
+    y = 2 * (y / H - 0.5)
+    # stacking X and Y
+    grid = torch.stack((x, y), dim=3)
+    # Sample pixels using bilinear interpolation.
+    imgOut = torch.nn.functional.grid_sample(img, grid)  # I2 , F12
+    return imgOut
+
+
 flow_parser = argparse.ArgumentParser()
 flow_parser.add_argument('--model', help="restore checkpoint",
-                         default="models/modules/GMA_checkpoints/gma-kitti.pth")
+                         default="models/modules/GMA_checkpoints/gma-sintel.pth")
 flow_parser.add_argument('--model_name', help="define model name", default="GMA")
 flow_parser.add_argument('--path', help="dataset for evaluation",
                          default="models/modules/GMA_imgs")
@@ -245,89 +275,47 @@ class DRBNet_mid(nn.Module):
         # print(f"Loaded checkpoint at {flow_args.model}")
 
     def forward(self, x):
-        path = 'D:/REDS/ori.png'
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        img = img.astype(np.float32) / 255.
-        img = img[:, :, [2, 1, 0]]
-        img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float()
-        img = img[None].to('cuda') * 255
-        # image1 = img[:, :, 73:73 + 64, 16:16 + 64]
-        # image1 = x[0][0:8, :, :, :]
-        image1 = x[0]
+        src_img, dst_img = x[0], x[2]
+        x[0] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
 
-        path = 'D:/REDS/ori_3.png'
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        img = img.astype(np.float32) / 255.
-        img = img[:, :, [2, 1, 0]]
-        img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float()
-        img = img[None].to('cuda') * 255
-        # image2 = img[:, :, 73:73 + 64, 16:16 + 64]
-        # image2 = x[2][0:8, :, :, :]
-        image2 = x[2]
+        src_img, dst_img = x[1], x[2]
+        x[1] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
 
-        padder = InputPadder(image1.shape)
-        image1, image2 = padder.pad(image1, image2)
-        flow_low, flow_up = self.GMA_model(image1, image2, iters=12, test_mode=True)
+        src_img, dst_img = x[3], x[2]
+        x[3] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
 
-        ####
-        W, H = image1.shape[-1], image1.shape[-2]
-        gridX, gridY = np.meshgrid(np.arange(W), np.arange(H))
+        src_img, dst_img = x[4], x[2]
+        x[4] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
 
-        self.gridX = torch.tensor(gridX, requires_grad=False, device='cuda')
-        self.gridY = torch.tensor(gridY, requires_grad=False, device='cuda')
+        ## show image
+        # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
 
-        u = flow_up[:, 0, :, :]
-        v = flow_up[:, 1, :, :]
-        grid_x = self.gridX.unsqueeze(0).expand_as(u).float() + u
-        grid_y = self.gridY.unsqueeze(0).expand_as(v).float() + v
-        # grid_x = torch.clamp(grid_x, min=-W, max=W)
-        # grid_y = torch.clamp(grid_y, min=-H, max=H)
-        # range -1 to 1
-        grid_x = 2 * (grid_x / W - 0.5)
-        grid_y = 2 * (grid_y / H - 0.5)
+        x1 = torch.cat((x[0], x[1], x[2]), 1)
+        x2 = torch.cat((x[1], x[2], x[3]), 1)
+        x3 = torch.cat((x[2], x[3], x[4]), 1)
 
-        # stacking X and Y
-        grid = torch.stack((grid_x, grid_y), dim=3)
-        # Sample pixels using bilinear interpolation.
-        warped_images = torch.nn.functional.grid_sample(image1, grid)
+        x1 = self.in_feat1(x1)
+        x2 = self.in_feat2(x2)
+        x3 = self.in_feat3(x3)
 
-        show_PIL_image(warped_images[:, [2, 1, 0], :, :]).show()
+        U1 = self.U_net1([x1, x2])
+        U2 = self.U_net2([x2, x2])
+        U3 = self.U_net3([x3, x2])
 
-        # _, flow_tmp = self.GMA_model(x[0], x[2], iters=12, test_mode=True)
-        # flow.append(flow_tmp)
-        # _, flow_tmp = self.GMA_model(x[1], x[2], iters=12, test_mode=True)
-        # flow.append(flow_tmp)
-        # _, flow_tmp = self.GMA_model(x[3], x[2], iters=12, test_mode=True)
-        # flow.append(flow_tmp)
-        # _, flow_tmp = self.GMA_model(x[4], x[2], iters=12, test_mode=True)
-        # flow.append(flow_tmp)
-        #
-        # x1 = torch.cat((x[0], x[1], x[2]), 1)
-        # x2 = torch.cat((x[1], x[2], x[3]), 1)
-        # x3 = torch.cat((x[2], x[3], x[4]), 1)
-        #
-        # x1 = self.in_feat1(x1)
-        # x2 = self.in_feat2(x2)
-        # x3 = self.in_feat3(x3)
-        #
-        # U1 = self.U_net1([x1, x2])
-        # U2 = self.U_net2([x2, x2])
-        # U3 = self.U_net3([x3, x2])
-        #
-        # x1 = self.scale_up1(U1[0])
-        # x2 = self.scale_up2(U2[0])
-        # x3 = self.scale_up3(U3[0])
-        #
-        # scale_up_x1 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
-        # scale_up_x2 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
-        # scale_up_x3 = F.interpolate(x[3], scale_factor=2, mode='bilinear', align_corners=True)
-        #
-        # scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
-        # out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
-        # out = self.U_net4([out, out])
-        # # out = self.U_net4(torch.cat((scale_up_x, x1, x2, x3), 1))
-        # out = self.scale_up4(out[0])
-        # out = self.conv_out(out)
+        x1 = self.scale_up1(U1[0])
+        x2 = self.scale_up2(U2[0])
+        x3 = self.scale_up3(U3[0])
+
+        scale_up_x1 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
+        scale_up_x2 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
+        scale_up_x3 = F.interpolate(x[3], scale_factor=2, mode='bilinear', align_corners=True)
+
+        scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
+        out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
+        out = self.U_net4([out, out])
+        # out = self.U_net4(torch.cat((scale_up_x, x1, x2, x3), 1))
+        out = self.scale_up4(out[0])
+        out = self.conv_out(out)
         return out
 
     def initialize_weights(self):
