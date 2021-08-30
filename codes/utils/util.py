@@ -11,6 +11,7 @@ import cv2
 import torch
 from torchvision.utils import make_grid
 from shutil import get_terminal_size
+import torch.nn as nn
 
 import yaml
 try:
@@ -33,6 +34,33 @@ def OrderedYaml():
     Loader.add_constructor(_mapping_tag, dict_constructor)
     return Loader, Dumper
 
+####################
+# functions for DRB
+####################
+def initialize_weights(net_list, scale=1):
+    if not isinstance(net_list, list):
+        net_list = [net_list]
+    for net in net_list:
+        for m in net.modules():
+            if isinstance(m, nn.Conv2d):
+                # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
+                m.weight.data *= scale
+                if m.bias is not None:
+                    # nn.init.constant_(m.bias, 0)
+                    m.bias.data.zero_()
+
+            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+            elif isinstance(m, nn.Linear):
+                # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
+                m.weight.data *= scale
+                if m.bias is not None:
+                    # nn.init.constant_(m.bias, 0)
+                    m.bias.data.zero_()
 
 ####################
 # miscellaneous

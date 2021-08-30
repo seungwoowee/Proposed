@@ -52,7 +52,6 @@ network_DRB:
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
   pretrain_model_DRB: ~
-  pretrain_model_Flow: ../pretrained_model/gma-sintel.pth
   strict_load: true
   resume_state: ~
 
@@ -68,7 +67,7 @@ train:
   beta2_D: 0.999
 
   lr_DRB: !!float 1e-4
-  weight_decay_DRB: 0
+  weight_decay_DRB: !!float 1e-5  # 0
   beta1_DRB: 0.9
   beta2_DRB: 0.999
 
@@ -79,7 +78,7 @@ train:
   lr_steps: [50000, 100000, 200000, 300000]
   lr_gamma: 0.5
 
-  pixel_criterion: l1
+  pixel_criterion: cb
   pixel_weight: !!float 1e-2  # 1
   feature_criterion: l1
   feature_weight: 1
@@ -96,4 +95,4 @@ train:
 ## tensorboard --logdir ./tb_logger --port=6006
 logger:
   print_freq: 100
-  save_checkpoint_freq: !!float 5e3
+  save_checkpoint_freq: !!float 1e4
