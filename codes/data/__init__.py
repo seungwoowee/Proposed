@@ -29,6 +29,8 @@ def create_dataset(dataset_opt):
     mode = dataset_opt['mode']
     if mode == 'DRB':
         from data.DRB_dataset import DRBDataset as D
+    elif mode == 'DRB_no_patch':
+        from data.DRB_dataset_no_patch import DRBDataset_no_patch as D
     elif mode == 'LR':
         from data.LR_dataset import LRDataset as D
     elif mode == 'LQGT':

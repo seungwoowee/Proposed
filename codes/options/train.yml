@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_6e5
+name: DRB_SR_new1
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -10,14 +10,14 @@ gpu_ids: [0,1]
 datasets:
   train:
     name: train
-    mode: DRB
+    mode: DRB_no_patch
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
     dataroot_GT: ../../../datasets/REDS_sep/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
     dataroot_LR: ../../../datasets/REDS_sep/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 8
+    batch_size: 1
     GT_size: 256
     use_flip: true
     use_rot: true
@@ -58,7 +58,7 @@ path:
 
 #### training settings: learning rate scheme, loss
 train:
-  lr_G: !!float 1e-5
+  lr_G: !!float 1e-4
   weight_decay_G: 0
   beta1_G: 0.9
   beta2_G: 0.999
@@ -79,7 +79,7 @@ train:
   lr_steps: [50000, 100000, 200000, 300000]
   lr_gamma: 0.5
 
-  pixel_criterion: l1
+  pixel_criterion: cb
   pixel_weight: !!float 1e-2  # 1
   feature_criterion: l1
   feature_weight: 1
@@ -93,6 +93,19 @@ train:
   val_freq: !!float 5e3
 
 #### logger
+## tensorboard --logdir ./tb_logger --port=6006
 logger:
   print_freq: 100
   save_checkpoint_freq: !!float 5e3
+
+
+# server ssh
+  # ssh icsp@166.104.36.34
+
+# watch nvidia
+  # watch -n 0.5 -d nvimia-smi
+
+# server tensor board
+# PC: ssh -L 16006:localhost:6006 icsp@166.104.36.34
+# server: tensorboard --logdir sda/VSR/Proposed/tb_logger
+

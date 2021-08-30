@@ -1,6 +1,88 @@
+# import sys
+# sys.path.append('models\modules\GMA_core')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import argparse
+import os
+from codes.utils import util
+from codes.data.util import read_img
+
+from models.modules.GMA_core.GMA_network import RAFTGMA
+from models.modules.GMA_core.GMA_utils.utils import InputPadder
+
+import numpy as np
+from PIL import Image
+import cv2
+
+import torchvision.transforms as transforms
+
+
+def load_image(path):
+    img = np.array(Image.open(path)).astype(np.uint8)
+    img = torch.from_numpy(img).permute(2, 0, 1).float()
+
+    return img[None].to('cuda')
+
+
+def show_PIL_image(imgs):
+    tf = transforms.ToPILImage()
+
+    dst = Image.new('RGB', (imgs.shape[-1], imgs.shape[-2] * len(imgs)))
+    dst.paste(tf(imgs.detach()[0].float().cpu()), (0, 0))
+    # dst.show()
+    for i in range(len(imgs) - 1):
+        img = tf(imgs.detach()[i + 1].float().cpu())
+        dst.paste(img, (0, img.height * (i + 1)))
+
+    return dst
+
+
+def flow_cal_backwarp(src_img, dst_img, model):
+    padder = InputPadder(src_img.shape)
+    src_img, dst_img = padder.pad(src_img, dst_img)
+    _, flow = model(src_img, dst_img, iters=12, test_mode=True)
+    out = backwarp(padder.unpad(dst_img), padder.unpad(flow))
+    return out
+
+
+def backwarp(img, flow):
+    _, _, H, W = img.size()
+
+    u = flow[:, 0, :, :]
+    v = flow[:, 1, :, :]
+
+    gridW, gridH = np.meshgrid(np.arange(W), np.arange(H))
+
+    gridW = torch.tensor(gridW, requires_grad=False, device=torch.device('cuda'))
+    gridH = torch.tensor(gridH, requires_grad=False, device=torch.device('cuda'))
+    x = gridW.unsqueeze(0).expand_as(u).float() + u
+    y = gridH.unsqueeze(0).expand_as(v).float() + v
+    # range -1 to 1
+    x = 2 * (x / W - 0.5)
+    y = 2 * (y / H - 0.5)
+    # stacking X and Y
+    grid = torch.stack((x, y), dim=3)
+    # Sample pixels using bilinear interpolation.
+    imgOut = torch.nn.functional.grid_sample(img, grid, align_corners=True)  # I2 , F12
+    return imgOut
+
+
+flow_parser = argparse.ArgumentParser()
+flow_parser.add_argument('--model', help="restore checkpoint",
+                         default="models/modules/GMA_checkpoints/gma-sintel.pth")
+flow_parser.add_argument('--model_name', help="define model name", default="GMA")
+flow_parser.add_argument('--path', help="dataset for evaluation",
+                         default="models/modules/GMA_imgs")
+flow_parser.add_argument('--num_heads', default=1, type=int,
+                         help='number of heads in attention and aggregation')
+flow_parser.add_argument('--position_only', default=False, action='store_true',
+                         help='only use position-wise attention')
+flow_parser.add_argument('--position_and_content', default=False, action='store_true',
+                         help='use position and content-wise attention')
+flow_parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
+flow_args = flow_parser.parse_args()
 
 
 class ResModule(nn.Module):
@@ -99,28 +181,28 @@ class U_shaped_Net_with_CA_dense(nn.Module):
                                   bias=False)
 
     def forward(self, x):
-        cat1 = x[0]
-        x[0] = self.resB_down1(x[0])
-        cat2 = x[0]
-        x[0] = self.resB_down2(x[0])
-        x[0] = self.deconv3(x[0], output_size=[x[0].size(0), x[0].size(1), x[0].size(2) * 2, x[0].size(3) * 2])
-        x[0] = torch.cat((cat2, x[0]), 1)
-        x[0] = self.resB4(x[0])
-        x[0] = self.deconv5(x[0], output_size=[x[0].size(0), x[0].size(1), x[0].size(2) * 2, x[0].size(3) * 2])
-        x[0] = torch.cat((cat1, x[0]), 1)
-        x[0] = self.resB6(x[0])
-        x[0] = self.CA(x[0])
+        cat1 = x[1]
+        x[1] = self.resB_down1(x[1])
+        cat2 = x[1]
+        x[1] = self.resB_down2(x[1])
+        x[1] = self.deconv3(x[1], output_size=[x[1].size(0), x[1].size(1), x[1].size(2) * 2, x[1].size(3) * 2])
+        x[1] = torch.cat((cat2, x[1]), 1)
+        x[1] = self.resB4(x[1])
+        x[1] = self.deconv5(x[1], output_size=[x[1].size(0), x[1].size(1), x[1].size(2) * 2, x[1].size(3) * 2])
+        x[1] = torch.cat((cat1, x[1]), 1)
+        x[1] = self.resB6(x[1])
+        x[1] = self.CA(x[1])
         out = self.conv_out(torch.cat((x[0], x[1]), 1))
-        return [out, x[1]]
+        return [out, x[0]]
 
 
 class img_to_feat(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, use_bias):
         super(img_to_feat, self).__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, bias=use_bias),
             nn.PReLU(),
-            nn.Conv2d(in_channels=out_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1)
+            nn.Conv2d(in_channels=out_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, bias=use_bias)
         )
 
     def forward(self, x):
@@ -133,17 +215,17 @@ class DRBNet_mid(nn.Module):
     def __init__(self):
         super(DRBNet_mid, self).__init__()
         use_act = nn.PReLU()
-        use_bias = False
+        use_bias = True
         use_bn = False
 
         res_scale = 0.1
         block_n = 2
 
-        ch = 64
+        ch = 32
         ch_reduction = 16
-        self.in_feat1 = img_to_feat(in_ch=9, out_ch=ch)
-        self.in_feat2 = img_to_feat(in_ch=9, out_ch=ch)
-        self.in_feat3 = img_to_feat(in_ch=9, out_ch=ch)
+        self.in_feat1 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
+        self.in_feat2 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
+        self.in_feat3 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
 
         module_U_net1 = [
             U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
@@ -167,7 +249,7 @@ class DRBNet_mid(nn.Module):
         self.scale_up2 = scale_up_x2(ch)
         self.scale_up3 = scale_up_x2(ch)
 
-        self.in_feat4 = img_to_feat(in_ch=9, out_ch=ch)
+        self.in_feat4 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
         self.conv_1d = nn.Conv2d(in_channels=4 * ch, out_channels=2 * ch, kernel_size=1, stride=1, padding=0,
                                  bias=False)
         ch = 2 * ch
@@ -183,9 +265,34 @@ class DRBNet_mid(nn.Module):
         self.conv_out = nn.Conv2d(in_channels=ch, out_channels=3, kernel_size=3, stride=1, padding=1,
                                   bias=False)
 
-        self.initialize_weights()
+        util.initialize_weights(
+            [self.in_feat1, self.in_feat2, self.in_feat3, self.scale_up1, self.scale_up2, self.scale_up3, self.in_feat4,
+             self.conv_1d, self.scale_up4, self.conv_out])
+        util.initialize_weights([self.U_net1, self.U_net2, self.U_net3, self.U_net4], scale=0.1)
+
+        self.GMA_model = torch.nn.DataParallel(RAFTGMA(flow_args))
+        self.GMA_model.load_state_dict(torch.load(flow_args.model))
+        self.GMA_model = self.GMA_model.module
+        self.GMA_model.to('cuda')
+        self.GMA_model.eval()
+        # print(f"Loaded checkpoint at {flow_args.model}")
 
     def forward(self, x):
+        src_img, dst_img = x[0], x[2]
+        x[0] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+
+        src_img, dst_img = x[1], x[2]
+        x[1] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+
+        src_img, dst_img = x[3], x[2]
+        x[3] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+
+        src_img, dst_img = x[4], x[2]
+        x[4] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+
+        ## show image
+        # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
+
         x1 = torch.cat((x[0], x[1], x[2]), 1)
         x2 = torch.cat((x[1], x[2], x[3]), 1)
         x3 = torch.cat((x[2], x[3], x[4]), 1)
@@ -202,9 +309,16 @@ class DRBNet_mid(nn.Module):
         x2 = self.scale_up2(U2[0])
         x3 = self.scale_up3(U3[0])
 
-        scale_up_x1 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x2 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x3 = F.interpolate(x[3], scale_factor=2, mode='bilinear', align_corners=True)
+        scale_up_x1 = F.interpolate(x[1], scale_factor=2, mode='bilinear')
+        scale_up_x2 = F.interpolate(x[2], scale_factor=2, mode='bilinear')
+        scale_up_x3 = F.interpolate(x[3], scale_factor=2, mode='bilinear')
+
+        ## warp
+        src_img, dst_img = scale_up_x1, scale_up_x2
+        scale_up_x1 = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+
+        src_img, dst_img = scale_up_x3, scale_up_x2
+        scale_up_x3 = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
 
         scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
         out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
@@ -213,21 +327,6 @@ class DRBNet_mid(nn.Module):
         out = self.scale_up4(out[0])
         out = self.conv_out(out)
         return out
-
-    def initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                nn.init.constant_(m.bias, 0)
 
 
 class DRBNet_side_2nd(nn.Module):
@@ -316,21 +415,6 @@ class DRBNet_side_2nd(nn.Module):
         out = self.conv_out(out)
         return out
 
-    def initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                nn.init.constant_(m.bias, 0)
-
 
 class DRBNet_side_1st(nn.Module):
     def __init__(self):
@@ -416,18 +500,3 @@ class DRBNet_side_1st(nn.Module):
         out = self.scale_up4(out[0])
         out = self.conv_out(out)
         return out
-
-    def initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                nn.init.constant_(m.bias, 0)
