@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import argparse
 import os
-from codes.utils import util
-from codes.data.util import read_img
+from utils import util
+from data.util import read_img
 
 from models.modules.GMA_core.GMA_network import RAFTGMA
 from models.modules.GMA_core.GMA_utils.utils import InputPadder
@@ -39,11 +39,11 @@ def show_PIL_image(imgs):
     return dst
 
 
-def flow_cal_backwarp(src_img, dst_img, model):
-    padder = InputPadder(src_img.shape)
-    src_img, dst_img = padder.pad(src_img, dst_img)
-    _, flow = model(src_img, dst_img, iters=12, test_mode=True)
-    out = backwarp(padder.unpad(dst_img), padder.unpad(flow))
+def flow_cal_backwarp(ref_img, src_img, model):
+    padder = InputPadder(ref_img.shape)
+    ref_img, src_img = padder.pad(ref_img, src_img)
+    _, flow = model(ref_img, src_img, iters=12, test_mode=True)
+    out = backwarp(padder.unpad(src_img), padder.unpad(flow))
     return out
 
 
@@ -140,15 +140,49 @@ class ResModule_down(nn.Module):
         return out
 
 
-class scale_up_x2(nn.Module):
+class scale_up_x2_deconv(nn.Module):
     def __init__(self, ch):
-        super(scale_up_x2, self).__init__()
+        super(scale_up_x2_deconv, self).__init__()
         self.deconv = nn.ConvTranspose2d(ch, ch, 3, stride=2, padding=1)
 
     def forward(self, x):
         out = self.deconv(x, output_size=[x.size(0), x.size(1), x.size(2) * 2, x.size(3) * 2])
 
         return out
+
+
+class PixelShufflePack(nn.Module):
+    """ Pixel Shuffle upsample layer.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel_size (int): Kernel size of Conv layer to expand channels.
+
+    Returns:
+        Upsampled feature map.
+    """
+
+    def __init__(self, in_channels, out_channels):
+        super(PixelShufflePack, self).__init__()
+        self.upsample_conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels * 4,
+                                       kernel_size=3, padding=1)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+
+    def forward(self, x):
+        """Forward function for PixelShufflePack.
+
+        Args:
+            x (Tensor): Input tensor with shape (n, c, h, w).
+
+        Returns:
+            Tensor: Forward results.
+        """
+        x = self.upsample_conv(x)
+        x = F.pixel_shuffle(x, 2)
+        x = self.lrelu(x)
+
+        return x
 
 
 class CALayer(nn.Module):
@@ -228,49 +262,57 @@ class DRBNet_mid(nn.Module):
         use_bias = True
         use_bn = False
 
-        res_scale = 0.2
+        res_scale = 0.1
         block_n = 6
 
-        ch = 32
+        in_ch = 128
         ch_reduction_ratio = 16
-        self.in_feat1 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
-        self.in_feat2 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
-        self.in_feat3 = img_to_feat(in_ch=9, out_ch=ch, use_bias=use_bias)
+        self.in_feat1 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat2 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat3 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
 
-        self.CA = CALayer(inout_ch=3 * ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA = CALayer(inout_ch=3 * in_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+        mid_ch = 64
+        self.conv_1d = nn.Conv2d(in_channels=3 * in_ch, out_channels= mid_ch, kernel_size=1, stride=1, padding=0,
+                                 bias=use_bias)
 
         module_U_net1 = [
-            U_shaped_Net_with_CA_dense(ch=3 * ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
+            U_shaped_Net_with_CA_dense(ch=mid_ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
                                        ch_reduction_ratio=ch_reduction_ratio)
             for _ in range(block_n)]
         self.U_net1 = nn.Sequential(*module_U_net1)
 
-        self.scale_up_x2 = scale_up_x2(3 * ch)
-        self.scale_up_x4 = scale_up_x2(3 * ch)
 
-        self.HRconv = nn.Conv2d(in_channels=3 * ch, out_channels=3 * ch, kernel_size=3, stride=1, padding=1,
-                                  bias=use_bias)
+        self.upsample1 = PixelShufflePack(in_channels=mid_ch, out_channels=mid_ch)
+        self.upsample2 = PixelShufflePack(in_channels=mid_ch, out_channels=mid_ch)
+
+        self.HRconv = nn.Conv2d(in_channels=mid_ch, out_channels=mid_ch, kernel_size=3, stride=1, padding=1,
+                                bias=use_bias)
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        self.conv_out = nn.Conv2d(in_channels=3 * ch, out_channels=3, kernel_size=3, stride=1, padding=1,
+        self.conv_out = nn.Conv2d(in_channels=mid_ch, out_channels=3, kernel_size=3, stride=1, padding=1,
                                   bias=use_bias)
+        self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)
 
         util.initialize_weights(
-            [self.in_feat1, self.in_feat2, self.in_feat3, self.scale_up_x2, self.scale_up_x4,
+            [self.in_feat1, self.in_feat2, self.in_feat3, self.CA, self.upsample1, self.upsample2,
              self.HRconv, self.conv_out])
         util.initialize_weights([self.U_net1], scale=0.1)
 
     def forward(self, x):
-        src_img, dst_img = x[0], x[2]
-        x[0] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+        src_img = x[2]
 
-        src_img, dst_img = x[1], x[2]
-        x[1] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+        ref_img = x[0]
+        x[0] = flow_cal_backwarp(ref_img, src_img, self.GMA_model)
 
-        src_img, dst_img = x[3], x[2]
-        x[3] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+        ref_img = x[1]
+        x[1] = flow_cal_backwarp(ref_img, src_img, self.GMA_model)
 
-        src_img, dst_img = x[4], x[2]
-        x[4] = flow_cal_backwarp(src_img, dst_img, self.GMA_model)
+        ref_img = x[3]
+        x[3] = flow_cal_backwarp(ref_img, src_img, self.GMA_model)
+
+        ref_img = x[4]
+        x[4] = flow_cal_backwarp(ref_img, src_img, self.GMA_model)
 
         ## show image
         # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
@@ -284,15 +326,18 @@ class DRBNet_mid(nn.Module):
         x3 = self.in_feat3(x3)
 
         out = self.CA(torch.cat((x1, x2, x3), 1))
+        out = self.conv_1d(out)       # in_ch -> mid_ch
 
         out = self.U_net1(out)
 
-        out = self.scale_up_x2(out)
-        out = self.scale_up_x4(out)
+        out = self.upsample1(out)  # conv shuffle lrelu
+        out = self.upsample2(out)  # conv shuffle lrelu
 
-        x2 = F.interpolate(x[2], scale_factor=4, mode='bilinear')
         out = self.conv_out(self.lrelu(self.HRconv(out)))
-        return out + x2
+        src_img = self.img_upsample_x4(src_img)
+        out += src_img
+        return out
+
 
 
 class DRBNet_side_2nd(nn.Module):
