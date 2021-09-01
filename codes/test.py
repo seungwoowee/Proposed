@@ -68,9 +68,9 @@ def test():
             # save images
             suffix = opt['suffix']
             if suffix:
-                save_img_path = osp.join(dataset_dir, img_path.split('\\')[-2]+'_'+img_name + suffix + '.png')
+                save_img_path = osp.join(dataset_dir, img_path.split('\\')[-2] + '_' + img_name + suffix + '.png')
             else:
-                save_img_path = osp.join(dataset_dir, img_path.split('\\')[-2]+'_'+img_name + '.png')
+                save_img_path = osp.join(dataset_dir, img_path.split('\\')[-2] + '_' + img_name + '.png')
             util.save_img(sr_img, save_img_path)
 
             # calculate PSNR and SSIM

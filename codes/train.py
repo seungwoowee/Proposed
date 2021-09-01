@@ -174,6 +174,18 @@ def main():
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         if rank <= 0:
                             tb_logger.add_scalar(k, v, current_step)
+
+                visuals = model.get_current_visuals()
+                sr_img = util.tensor2img(visuals['SR'])  # uint8
+                gt_img = util.tensor2img(visuals['GT'])  # uint8
+
+                # calculate PSNR
+                sr_img = sr_img / 255.
+                gt_img = gt_img / 255.
+                cur_psnr = util.calculate_psnr(sr_img * 255, gt_img * 255)
+                message += '{:s}: {:.4e} '.format('cur_psnr', cur_psnr)
+                tb_logger.add_scalar('cur_psnr', cur_psnr, current_step)
+
                 if rank <= 0:
                     logger.info(message)
 
@@ -190,11 +202,6 @@ def main():
                     elif opt['datasets']['val']['position'] == 'side_1st':
                         file_idx = 0
 
-                    img_name = os.path.splitext(os.path.basename(val_data['LR_path'][file_idx][0]))[0]
-                    # img_dir = os.path.join(opt['path']['val_images'], img_name)
-                    img_dir = opt['path']['val_images']
-                    util.mkdir(img_dir)
-
                     model.feed_data(val_data)
                     model.test()
 
@@ -203,9 +210,18 @@ def main():
                     gt_img = util.tensor2img(visuals['GT'])  # uint8
 
                     # Save SR images for reference
-                    # save_img_path = os.path.join(img_dir, '{:s}_{:s}_{:d}.png'.format(
-                    #     val_data['LR_path'][file_idx][0].split('/')[-2], img_name, current_step))
-                    # util.save_img(sr_img, save_img_path)
+                    if opt['position'] == 'mid':
+                        file_idx = 2
+                    elif opt['position'] == 'side_2nd':
+                        file_idx = 1
+                    elif opt['position'] == 'side_1st':
+                        file_idx = 0
+                    img_name = os.path.splitext(os.path.basename(val_data['LR_path'][file_idx][0]))[0]
+                    img_dir = opt['path']['val_images']
+                    util.mkdir(img_dir)
+                    save_img_path = os.path.join(img_dir, '{:s}_{:s}_{:d}.png'.format(
+                        val_data['LR_path'][0][0].split('/')[-2], img_name, current_step))
+                    util.save_img(sr_img, save_img_path)
 
                     # calculate PSNR
                     crop_size = opt['scale']
@@ -215,11 +231,10 @@ def main():
                     cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
 
-
                 avg_psnr = avg_psnr / idx
-                val_pix_err_f /= idx
-                val_pix_err_nf /= idx
-                val_mean_color_err /= idx
+                # val_pix_err_f /= idx
+                # val_pix_err_nf /= idx
+                # val_mean_color_err /= idx
 
                 # log
                 logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
@@ -229,9 +244,9 @@ def main():
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
-                    tb_logger.add_scalar('val_pix_err_f', val_pix_err_f, current_step)
-                    tb_logger.add_scalar('val_pix_err_nf', val_pix_err_nf, current_step)
-                    tb_logger.add_scalar('val_mean_color_err', val_mean_color_err, current_step)
+                    # tb_logger.add_scalar('val_pix_err_f', val_pix_err_f, current_step)
+                    # tb_logger.add_scalar('val_pix_err_nf', val_pix_err_nf, current_step)
+                    # tb_logger.add_scalar('val_mean_color_err', val_mean_color_err, current_step)
 
             #### save models and training states
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
@@ -254,7 +269,6 @@ def main():
                     # resume_model.resume_training(resume_state)  # handle optimizers and schedulers
                     # logger.info('{}.'.format(resume_model.optimizers[0].param_groups[0]['params'][0].shape ==
                     #                          model.optimizers[0].param_groups[0]['params'][0].shape))
-
 
     if rank <= 0:
         logger.info('Saving the final model.')
