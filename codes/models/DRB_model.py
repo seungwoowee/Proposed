@@ -28,26 +28,55 @@ class DRBModel(BaseModel):
             self.netDRB = DistributedDataParallel(self.netDRB, device_ids=[torch.cuda.current_device()])
         else:
             self.netDRB = DataParallel(self.netDRB)
-        # print network
-        self.print_network()
-        self.load()
 
         if self.is_train:
             self.netDRB.train()
-
-            # loss
-            loss_type = train_opt['pixel_criterion']
-            if loss_type == 'l1':
-                self.cri_pix = nn.L1Loss().to(self.device)
-            elif loss_type == 'l2':
-                self.cri_pix = nn.MSELoss().to(self.device)
-            elif loss_type == 'cb':
-                self.cri_pix = CharbonnierLoss().to(self.device)
+            # pixel loss
+            if train_opt['pixel_weight'] > 0:
+                l_pix_type = train_opt['pixel_criterion']
+                if l_pix_type == 'l1':
+                    self.cri_pix = nn.L1Loss().to(self.device)
+                elif l_pix_type == 'l2':
+                    self.cri_pix = nn.MSELoss().to(self.device)
+                elif l_pix_type == 'cb':
+                    self.cri_pix = CharbonnierLoss().to(self.device)
+                else:
+                    raise NotImplementedError('Loss type [{:s}] is not recognized.'.format(l_pix_type))
+                self.l_pix_w = train_opt['pixel_weight']
             else:
-                raise NotImplementedError('Loss type [{:s}] is not recognized.'.format(loss_type))
-            self.l_pix_w = train_opt['pixel_weight']
+                logger.info('Remove pixel loss.')
+                self.cri_pix = None
+
+            # feature loss
+            if train_opt['feature_weight'] > 0:
+                l_fea_type = train_opt['feature_criterion']
+                if l_fea_type == 'l1':
+                    self.cri_fea = nn.L1Loss().to(self.device)
+                elif l_fea_type == 'l2':
+                    self.cri_fea = nn.MSELoss().to(self.device)
+                elif l_fea_type == 'cb':
+                    self.cri_fea = CharbonnierLoss().to(self.device)
+                else:
+                    raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_fea_type))
+                self.l_fea_w = train_opt['feature_weight']
+            else:
+                logger.info('Remove feature loss.')
+                self.cri_fea = None
+
+            if self.cri_fea:  # load VGG perceptual loss
+                self.netF = networks.define_F(opt, use_bn=False).to(self.device)
+                if opt['dist']:
+                    self.netF = DistributedDataParallel(self.netF,
+                                                        device_ids=[torch.cuda.current_device()])
+                else:
+                    self.netF = DataParallel(self.netF)
+
+            # D_update_ratio and D_init_iters
+            self.D_update_ratio = train_opt['D_update_ratio'] if train_opt['D_update_ratio'] else 1
+            self.D_init_iters = train_opt['D_init_iters'] if train_opt['D_init_iters'] else 0
 
             # optimizers
+            # DRB
             wd_DRB = train_opt['weight_decay_DRB'] if train_opt['weight_decay_DRB'] else 0
             optim_params = []
             for k, v in self.netDRB.named_parameters():  # can optimize for a part of the model
@@ -57,12 +86,13 @@ class DRBModel(BaseModel):
                     if self.rank <= 0:
                         logger.warning('Params [{:s}] will not optimize.'.format(k))
             self.optimizer_DRB = torch.optim.Adam(optim_params, lr=train_opt['lr_DRB'],
-                                                weight_decay=wd_DRB,
-                                                betas=(train_opt['beta1_DRB'], train_opt['beta2_DRB']))
+                                                  weight_decay=wd_DRB,
+                                                  betas=(train_opt['beta1_DRB'], train_opt['beta2_DRB']))
             self.optimizers.append(self.optimizer_DRB)
 
+
             # schedulers
-            if train_opt['lr_scheme'] == 'MultiStepLR':
+            if train_opt['lr_scheme'] == 'MultiStepLR_Restart':
                 for optimizer in self.optimizers:
                     self.schedulers.append(
                         lr_scheduler.MultiStepLR_Restart(optimizer, train_opt['lr_steps'],
@@ -81,6 +111,10 @@ class DRBModel(BaseModel):
 
             self.log_dict = OrderedDict()
 
+        # print network
+        self.print_network()
+        self.load()
+
     def feed_data(self, data, need_GT=True):
         self.LR_data, self.GT_data = [], []
         for idx, LR in enumerate(data['LR']):  # LR
@@ -92,12 +126,22 @@ class DRBModel(BaseModel):
     def optimize_parameters(self, step):
         self.optimizer_DRB.zero_grad()
         self.SR_data = self.netDRB(self.LR_data)
-        l_pix = self.l_pix_w * self.cri_pix(self.SR_data, self.GT_data)
-        l_pix.backward()
+
+        l_total_total = 0
+        if step % self.D_update_ratio == 0 and step > self.D_init_iters:
+            if self.cri_pix:  # pixel loss
+                l_g_pix = self.l_pix_w * self.cri_pix(self.SR_data, self.GT_data)
+                l_total_total += l_g_pix
+            if self.cri_fea:  # feature loss
+                real_fea = self.netF(self.GT_data).detach()
+                fake_fea = self.netF(self.SR_data)
+                l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
+                l_total_total += l_g_fea
+        l_total_total.backward()
         self.optimizer_DRB.step()
 
         # set log
-        self.log_dict['l_pix'] = l_pix.item()
+        self.log_dict['l_pix'] = l_total_total.item()
 
     def test(self):
         self.netDRB.eval()
@@ -146,7 +190,7 @@ class DRBModel(BaseModel):
 
     def get_current_visuals(self, need_GT=True):
         out_dict = OrderedDict()
-        out_dict['LR'] = self.LR_data[len(self.LR_data)//2].detach()[0].float().cpu()
+        out_dict['LR'] = self.LR_data[len(self.LR_data) // 2].detach()[0].float().cpu()
         out_dict['SR'] = self.SR_data.detach()[0].float().cpu()
         if need_GT:
             out_dict['GT'] = self.GT_data.detach()[0].float().cpu()

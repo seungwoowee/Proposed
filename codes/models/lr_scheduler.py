@@ -74,36 +74,36 @@ if __name__ == "__main__":
     restart_weights = None
 
     ## two
-    lr_steps = [100000, 200000, 300000, 400000, 490000, 600000, 700000, 800000, 900000, 990000]
-    restarts = [500000]
-    restart_weights = [1]
-
-    ## four
-    lr_steps = [
-        50000, 100000, 150000, 200000, 240000, 300000, 350000, 400000, 450000, 490000, 550000,
-        600000, 650000, 700000, 740000, 800000, 850000, 900000, 950000, 990000
-    ]
-    restarts = [250000, 500000, 750000]
-    restart_weights = [1, 1, 1]
-
-    scheduler = MultiStepLR_Restart(optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
-                                    clear_state=False)
+    # lr_steps = [100000, 200000, 300000, 400000, 490000, 600000, 700000, 800000, 900000, 990000]
+    # restarts = [500000]
+    # restart_weights = [1]
+    #
+    # ## four
+    # lr_steps = [
+    #     50000, 100000, 150000, 200000, 240000, 300000, 350000, 400000, 450000, 490000, 550000,
+    #     600000, 650000, 700000, 740000, 800000, 850000, 900000, 950000, 990000
+    # ]
+    # restarts = [250000, 500000, 750000]
+    # restart_weights = [1, 1, 1]
+    #
+    # scheduler = MultiStepLR_Restart(optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
+    #                                 clear_state=False)
 
     ##############################
     # Cosine Annealing Restart
     ##############################
     ## two
-    T_period = [500000, 500000]
-    restarts = [500000]
-    restart_weights = [1]
-
-    ## four
-    T_period = [250000, 250000, 250000, 250000]
-    restarts = [250000, 500000, 750000]
-    restart_weights = [1, 1, 1]
-
-    scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
-                                          weights=restart_weights)
+    # T_period = [500000, 500000]
+    # restarts = [500000]
+    # restart_weights = [1]
+    #
+    # ## four
+    # T_period = [250000, 250000, 250000, 250000]
+    # restarts = [250000, 500000, 750000]
+    # restart_weights = [1, 1, 1]
+    #
+    # scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
+    #                                       weights=restart_weights)
 
     ##############################
     # Draw figure
