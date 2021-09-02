@@ -228,7 +228,8 @@ class U_shaped_Net_with_CA_dense(nn.Module):
         out = self.resB6(out)
         out = self.CA(out)
         out = self.conv_out(torch.cat((out, x), 1))
-        return out
+
+        return out + x
 
 
 class img_to_feat(nn.Module):
