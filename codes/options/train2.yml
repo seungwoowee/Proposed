@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_lrDRB_1e-4_pixelShuffle_cri_fea_TP30000_x10
+name: DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_cb_1e-2_TP30000_x10
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -95,7 +95,7 @@ train:
 
   pixel_criterion: cb   # l1
   pixel_weight: !!float 1e-2  # 1
-  feature_criterion: l1
+  feature_criterion: cb
   feature_weight: !!float 1e-2
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
