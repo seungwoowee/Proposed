@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1_TP40000_x10
+name: DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1_TP40000_x10
 use_tb_logger: true
 model: DRB
 distortion: sr

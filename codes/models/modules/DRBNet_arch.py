@@ -228,7 +228,8 @@ class U_shaped_Net_with_CA_dense(nn.Module):
         out = self.resB6(out)
         out = self.CA(out)
         out = self.conv_out(torch.cat((out, x), 1))
-        return out
+
+        return out + x
 
 
 class img_to_feat(nn.Module):
@@ -263,7 +264,7 @@ class DRBNet_mid(nn.Module):
         use_bn = False
 
         res_scale = 0.1
-        block_n = 1
+        block_n = 3
 
         in_ch = 128
         ch_reduction_ratio = 16
