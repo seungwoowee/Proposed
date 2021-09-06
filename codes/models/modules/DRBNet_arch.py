@@ -264,7 +264,7 @@ class DRBNet_mid(nn.Module):
         use_bn = False
 
         res_scale = 0.1
-        block_n = 6
+        block_n = 3
 
         in_ch = 128
         ch_reduction_ratio = 16
@@ -338,6 +338,7 @@ class DRBNet_mid(nn.Module):
         src_img = self.img_upsample_x4(src_img)
         out += src_img
         return out
+
 
 
 class DRBNet_side_2nd(nn.Module):
