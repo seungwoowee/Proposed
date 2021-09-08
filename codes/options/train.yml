@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_l1_1_TP150000_x4
+name: DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1_TP40000_x10
 
 use_tb_logger: true
 model: DRB
@@ -98,9 +98,9 @@ train:
   lr_gamma: 0.5
 
   pixel_criterion: cb   # l1
-  pixel_weight: !!float 1e-2  # 1
+  pixel_weight: !!float 1e-3  # 1
   feature_criterion: l1
-  feature_weight: !!float 1e-1  # 1
+  feature_weight: 1 # !!float 1e-1
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 

@@ -19,6 +19,11 @@ import cv2
 import torchvision.transforms as transforms
 
 
+import functools
+import models.modules.module_util as mutil
+
+
+
 def load_image(path):
     img = np.array(Image.open(path)).astype(np.uint8)
     img = torch.from_numpy(img).permute(2, 0, 1).float()
@@ -266,16 +271,16 @@ class DRBNet_mid(nn.Module):
         res_scale = 0.1
         block_n = 3
 
-        in_ch = 128
+        in_ch = 64
         ch_reduction_ratio = 16
         self.in_feat1 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
         self.in_feat2 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
         self.in_feat3 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
 
-        self.CA = CALayer(inout_ch=3 * in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
 
         mid_ch = 64
-        self.conv_1d = nn.Conv2d(in_channels=3 * in_ch, out_channels= mid_ch, kernel_size=1, stride=1, padding=0,
+        self.conv_1d = nn.Conv2d(in_channels=3 * in_ch, out_channels=mid_ch, kernel_size=1, stride=1, padding=0,
                                  bias=use_bias)
 
         module_U_net1 = [
@@ -326,8 +331,11 @@ class DRBNet_mid(nn.Module):
         x2 = self.in_feat2(x2)
         x3 = self.in_feat3(x3)
 
-        out = self.CA(torch.cat((x1, x2, x3), 1))
-        out = self.conv_1d(out)       # in_ch -> mid_ch
+        x1 = self.CA(x1) + x1
+        x2 = self.CA(x2) + x2
+        x3 = self.CA(x3) + x3
+
+        out = self.conv_1d(torch.cat(x1, x2, x3), 1)       # in_ch -> mid_ch
 
         out = self.U_net1(out)
 
@@ -341,174 +349,69 @@ class DRBNet_mid(nn.Module):
 
 
 
-class DRBNet_side_2nd(nn.Module):
-    def __init__(self):
-        super(DRBNet_side_2nd, self).__init__()
-        use_act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        use_bias = False
-        use_bn = False
 
-        res_scale = 0.1
-        block_n = 2
+class ResidualDenseBlock_5C(nn.Module):
+    def __init__(self, nf=64, gc=32, bias=True):
+        super(ResidualDenseBlock_5C, self).__init__()
+        # gc: growth channel, i.e. intermediate channels
+        self.conv1 = nn.Conv2d(nf, gc, 3, 1, 1, bias=bias)
+        self.conv2 = nn.Conv2d(nf + gc, gc, 3, 1, 1, bias=bias)
+        self.conv3 = nn.Conv2d(nf + 2 * gc, gc, 3, 1, 1, bias=bias)
+        self.conv4 = nn.Conv2d(nf + 3 * gc, gc, 3, 1, 1, bias=bias)
+        self.conv5 = nn.Conv2d(nf + 4 * gc, nf, 3, 1, 1, bias=bias)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
-        ch = 64
-        ch_reduction_ratio = 16
-        self.in_feat1 = img_to_feat(in_ch=3, out_ch=ch)
-        self.in_feat2 = img_to_feat(in_ch=9, out_ch=ch)
-        self.in_feat3 = img_to_feat(in_ch=3, out_ch=ch)
-
-        module_U_net1 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net1 = nn.Sequential(*module_U_net1)
-
-        module_U_net2 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net2 = nn.Sequential(*module_U_net2)
-
-        module_U_net3 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net3 = nn.Sequential(*module_U_net3)
-
-        self.scale_up1 = scale_up_x2(ch)
-        self.scale_up2 = scale_up_x2(ch)
-        self.scale_up3 = scale_up_x2(ch)
-
-        self.in_feat4 = img_to_feat(in_ch=9, out_ch=ch)
-        self.conv_1d = nn.Conv2d(in_channels=4 * ch, out_channels=2 * ch, kernel_size=1, stride=1, padding=0,
-                                 bias=False)
-
-        ch = 2 * ch
-        ch_reduction_ratio = 32
-        module_U_net4 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net4 = nn.Sequential(*module_U_net4)
-
-        self.scale_up4 = scale_up_x2(ch)
-
-        self.conv_out = nn.Conv2d(in_channels=ch, out_channels=3, kernel_size=3, stride=1, padding=1,
-                                  bias=False)
-
-        self.initialize_weights()
+        # initialization
+        mutil.initialize_weights([self.conv1, self.conv2, self.conv3, self.conv4, self.conv5], 0.1)
 
     def forward(self, x):
-        x1 = x[0]
-        x2 = torch.cat((x[0], x[1], x[2]), 1)
-        x3 = x[2]
-
-        x1 = self.in_feat1(x1)
-        x2 = self.in_feat2(x2)
-        x3 = self.in_feat3(x3)
-
-        U1 = self.U_net1([x1, x2])
-        U2 = self.U_net2([x2, x2])
-        U3 = self.U_net3([x3, x2])
-
-        x1 = self.scale_up1(U1[0])
-        x2 = self.scale_up2(U2[0])
-        x3 = self.scale_up3(U3[0])
-
-        scale_up_x1 = F.interpolate(x[0], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x2 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x3 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
-
-        scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
-        out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.U_net4([out, out])
-        # out = self.U_net4(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.scale_up4(out[0])
-        out = self.conv_out(out)
-        return out
+        x1 = self.lrelu(self.conv1(x))
+        x2 = self.lrelu(self.conv2(torch.cat((x, x1), 1)))
+        x3 = self.lrelu(self.conv3(torch.cat((x, x1, x2), 1)))
+        x4 = self.lrelu(self.conv4(torch.cat((x, x1, x2, x3), 1)))
+        x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
+        return x5 * 0.2 + x
 
 
-class DRBNet_side_1st(nn.Module):
-    def __init__(self):
-        super(DRBNet_side_1st, self).__init__()
-        use_act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        use_bias = False
-        use_bn = False
+class RRDB(nn.Module):
+    '''Residual in Residual Dense Block'''
 
-        res_scale = 0.1
-        block_n = 2
-
-        ch = 64
-        ch_reduction_ratio = 16
-        self.in_feat1 = img_to_feat(in_ch=9, out_ch=ch)
-        self.in_feat2 = img_to_feat(in_ch=3, out_ch=ch)
-        self.in_feat3 = img_to_feat(in_ch=3, out_ch=ch)
-
-        module_U_net1 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net1 = nn.Sequential(*module_U_net1)
-
-        module_U_net2 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net2 = nn.Sequential(*module_U_net2)
-
-        module_U_net3 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net3 = nn.Sequential(*module_U_net3)
-
-        self.scale_up1 = scale_up_x2(ch)
-        self.scale_up2 = scale_up_x2(ch)
-        self.scale_up3 = scale_up_x2(ch)
-
-        self.in_feat4 = img_to_feat(in_ch=9, out_ch=ch)
-        self.conv_1d = nn.Conv2d(in_channels=4 * ch, out_channels=2 * ch, kernel_size=1, stride=1, padding=0,
-                                 bias=False)
-        ch = 2 * ch
-        ch_reduction_ratio = 32
-        module_U_net4 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net4 = nn.Sequential(*module_U_net4)
-
-        self.scale_up4 = scale_up_x2(ch)
-
-        self.conv_out = nn.Conv2d(in_channels=ch, out_channels=3, kernel_size=3, stride=1, padding=1,
-                                  bias=False)
-
-        self.initialize_weights()
+    def __init__(self, nf, gc=32):
+        super(RRDB, self).__init__()
+        self.RDB1 = ResidualDenseBlock_5C(nf, gc)
+        self.RDB2 = ResidualDenseBlock_5C(nf, gc)
+        self.RDB3 = ResidualDenseBlock_5C(nf, gc)
 
     def forward(self, x):
-        x1 = torch.cat((x[0], x[1], x[2]), 1)
-        x2 = x[1]
-        x3 = x[2]
+        out = self.RDB1(x)
+        out = self.RDB2(out)
+        out = self.RDB3(out)
+        return out * 0.2 + x
 
-        x1 = self.in_feat1(x1)
-        x2 = self.in_feat2(x2)
-        x3 = self.in_feat3(x3)
 
-        U1 = self.U_net1([x1, x1])
-        U2 = self.U_net2([x2, x1])
-        U3 = self.U_net3([x3, x1])
+class RRDBNet(nn.Module):
+    def __init__(self, in_nc, out_nc, nf, nb, gc=32):
+        super(RRDBNet, self).__init__()
+        RRDB_block_f = functools.partial(RRDB, nf=nf, gc=gc)
 
-        x1 = self.scale_up1(U1[0])
-        x2 = self.scale_up2(U2[0])
-        x3 = self.scale_up3(U3[0])
+        self.conv_first = nn.Conv2d(in_nc, nf, 3, 1, 1, bias=True)
+        self.RRDB_trunk = mutil.make_layer(RRDB_block_f, nb)
+        self.trunk_conv = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        #### upsampling
+        self.upconv1 = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        self.upconv2 = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        self.HRconv = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        self.conv_last = nn.Conv2d(nf, out_nc, 3, 1, 1, bias=True)
 
-        scale_up_x1 = F.interpolate(x[0], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x2 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x3 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
-        scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
-        out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.U_net4([out, out])
-        # out = self.U_net4(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.scale_up4(out[0])
-        out = self.conv_out(out)
+    def forward(self, x):
+        fea = self.conv_first(x)
+        trunk = self.trunk_conv(self.RRDB_trunk(fea))
+        fea = fea + trunk
+
+        fea = self.lrelu(self.upconv1(F.interpolate(fea, scale_factor=2, mode='nearest')))
+        fea = self.lrelu(self.upconv2(F.interpolate(fea, scale_factor=2, mode='nearest')))
+        out = self.conv_last(self.lrelu(self.HRconv(fea)))
+
         return out
