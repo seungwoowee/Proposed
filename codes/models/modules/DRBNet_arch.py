@@ -19,6 +19,11 @@ import cv2
 import torchvision.transforms as transforms
 
 
+import functools
+import models.modules.module_util as mutil
+
+
+
 def load_image(path):
     img = np.array(Image.open(path)).astype(np.uint8)
     img = torch.from_numpy(img).permute(2, 0, 1).float()
@@ -266,16 +271,16 @@ class DRBNet_mid(nn.Module):
         res_scale = 0.1
         block_n = 3
 
-        in_ch = 128
+        in_ch = 64
         ch_reduction_ratio = 16
         self.in_feat1 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
         self.in_feat2 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
         self.in_feat3 = img_to_feat(in_ch=9, out_ch=in_ch, use_bias=use_bias)
 
-        self.CA = CALayer(inout_ch=3 * in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
 
         mid_ch = 64
-        self.conv_1d = nn.Conv2d(in_channels=3 * in_ch, out_channels= mid_ch, kernel_size=1, stride=1, padding=0,
+        self.conv_1d = nn.Conv2d(in_channels=3 * in_ch, out_channels=mid_ch, kernel_size=1, stride=1, padding=0,
                                  bias=use_bias)
 
         module_U_net1 = [
@@ -326,8 +331,11 @@ class DRBNet_mid(nn.Module):
         x2 = self.in_feat2(x2)
         x3 = self.in_feat3(x3)
 
-        out = self.CA(torch.cat((x1, x2, x3), 1))
-        out = self.conv_1d(out)       # in_ch -> mid_ch
+        x1 = self.CA(x1) + x1
+        x2 = self.CA(x2) + x2
+        x3 = self.CA(x3) + x3
+
+        out = self.conv_1d(torch.cat((x1, x2, x3), 1))       # in_ch -> mid_ch
 
         out = self.U_net1(out)
 
@@ -337,178 +345,4 @@ class DRBNet_mid(nn.Module):
         out = self.conv_out(self.lrelu(self.HRconv(out)))
         src_img = self.img_upsample_x4(src_img)
         out += src_img
-        return out
-
-
-
-class DRBNet_side_2nd(nn.Module):
-    def __init__(self):
-        super(DRBNet_side_2nd, self).__init__()
-        use_act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        use_bias = False
-        use_bn = False
-
-        res_scale = 0.1
-        block_n = 2
-
-        ch = 64
-        ch_reduction_ratio = 16
-        self.in_feat1 = img_to_feat(in_ch=3, out_ch=ch)
-        self.in_feat2 = img_to_feat(in_ch=9, out_ch=ch)
-        self.in_feat3 = img_to_feat(in_ch=3, out_ch=ch)
-
-        module_U_net1 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net1 = nn.Sequential(*module_U_net1)
-
-        module_U_net2 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net2 = nn.Sequential(*module_U_net2)
-
-        module_U_net3 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net3 = nn.Sequential(*module_U_net3)
-
-        self.scale_up1 = scale_up_x2(ch)
-        self.scale_up2 = scale_up_x2(ch)
-        self.scale_up3 = scale_up_x2(ch)
-
-        self.in_feat4 = img_to_feat(in_ch=9, out_ch=ch)
-        self.conv_1d = nn.Conv2d(in_channels=4 * ch, out_channels=2 * ch, kernel_size=1, stride=1, padding=0,
-                                 bias=False)
-
-        ch = 2 * ch
-        ch_reduction_ratio = 32
-        module_U_net4 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net4 = nn.Sequential(*module_U_net4)
-
-        self.scale_up4 = scale_up_x2(ch)
-
-        self.conv_out = nn.Conv2d(in_channels=ch, out_channels=3, kernel_size=3, stride=1, padding=1,
-                                  bias=False)
-
-        self.initialize_weights()
-
-    def forward(self, x):
-        x1 = x[0]
-        x2 = torch.cat((x[0], x[1], x[2]), 1)
-        x3 = x[2]
-
-        x1 = self.in_feat1(x1)
-        x2 = self.in_feat2(x2)
-        x3 = self.in_feat3(x3)
-
-        U1 = self.U_net1([x1, x2])
-        U2 = self.U_net2([x2, x2])
-        U3 = self.U_net3([x3, x2])
-
-        x1 = self.scale_up1(U1[0])
-        x2 = self.scale_up2(U2[0])
-        x3 = self.scale_up3(U3[0])
-
-        scale_up_x1 = F.interpolate(x[0], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x2 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x3 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
-
-        scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
-        out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.U_net4([out, out])
-        # out = self.U_net4(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.scale_up4(out[0])
-        out = self.conv_out(out)
-        return out
-
-
-class DRBNet_side_1st(nn.Module):
-    def __init__(self):
-        super(DRBNet_side_1st, self).__init__()
-        use_act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        use_bias = False
-        use_bn = False
-
-        res_scale = 0.1
-        block_n = 2
-
-        ch = 64
-        ch_reduction_ratio = 16
-        self.in_feat1 = img_to_feat(in_ch=9, out_ch=ch)
-        self.in_feat2 = img_to_feat(in_ch=3, out_ch=ch)
-        self.in_feat3 = img_to_feat(in_ch=3, out_ch=ch)
-
-        module_U_net1 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net1 = nn.Sequential(*module_U_net1)
-
-        module_U_net2 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net2 = nn.Sequential(*module_U_net2)
-
-        module_U_net3 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net3 = nn.Sequential(*module_U_net3)
-
-        self.scale_up1 = scale_up_x2(ch)
-        self.scale_up2 = scale_up_x2(ch)
-        self.scale_up3 = scale_up_x2(ch)
-
-        self.in_feat4 = img_to_feat(in_ch=9, out_ch=ch)
-        self.conv_1d = nn.Conv2d(in_channels=4 * ch, out_channels=2 * ch, kernel_size=1, stride=1, padding=0,
-                                 bias=False)
-        ch = 2 * ch
-        ch_reduction_ratio = 32
-        module_U_net4 = [
-            U_shaped_Net_with_CA_dense(ch=ch, bias=use_bias, bn=use_bn, act=use_act, res_scale=res_scale,
-                                       ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
-        self.U_net4 = nn.Sequential(*module_U_net4)
-
-        self.scale_up4 = scale_up_x2(ch)
-
-        self.conv_out = nn.Conv2d(in_channels=ch, out_channels=3, kernel_size=3, stride=1, padding=1,
-                                  bias=False)
-
-        self.initialize_weights()
-
-    def forward(self, x):
-        x1 = torch.cat((x[0], x[1], x[2]), 1)
-        x2 = x[1]
-        x3 = x[2]
-
-        x1 = self.in_feat1(x1)
-        x2 = self.in_feat2(x2)
-        x3 = self.in_feat3(x3)
-
-        U1 = self.U_net1([x1, x1])
-        U2 = self.U_net2([x2, x1])
-        U3 = self.U_net3([x3, x1])
-
-        x1 = self.scale_up1(U1[0])
-        x2 = self.scale_up2(U2[0])
-        x3 = self.scale_up3(U3[0])
-
-        scale_up_x1 = F.interpolate(x[0], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x2 = F.interpolate(x[1], scale_factor=2, mode='bilinear', align_corners=True)
-        scale_up_x3 = F.interpolate(x[2], scale_factor=2, mode='bilinear', align_corners=True)
-
-        scale_up_x = self.in_feat4(torch.cat((scale_up_x1, scale_up_x2, scale_up_x3), 1))
-        out = self.conv_1d(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.U_net4([out, out])
-        # out = self.U_net4(torch.cat((scale_up_x, x1, x2, x3), 1))
-        out = self.scale_up4(out[0])
-        out = self.conv_out(out)
         return out
