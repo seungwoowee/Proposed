@@ -1,10 +1,10 @@
 #### general settings
-name: DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e1_TP40000_x10
+name: DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-1_TP40000_x10
 use_tb_logger: true
 model: DRB
 distortion: sr
 scale: 4
-gpu_ids: [0]
+gpu_ids: [1]
 
 #### datasets
 datasets:
@@ -53,9 +53,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e1_TP40000_x10/models/10000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB_SR_new2/models/80000_G.pth
   strict_load: true
-  resume_state: ../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e1_TP40000_x10/training_state/10000.state
+  resume_state: ~ #../experiments/DRB_SR_new2/training_state/80000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -80,7 +80,7 @@ train:
   #  # MultiStepLR_Restart
   #  lr_scheme: MultiStepLR_Restart
   #  lr_steps: [50000, 100000, 200000, 300000]
-  #  restarts: [50000, 150000, 350000]
+  #  restarts: [250000, 500000, 750000]
   #  restart_weights: [1, 1, 1]
 
   #  # CosineAnnealingLR_Restart
@@ -93,10 +93,10 @@ train:
 
   lr_gamma: 0.5
 
-  pixel_criterion: cb   # l1
-  pixel_weight: !!float 1e-3  # 1
-  feature_criterion: l1
-  feature_weight: !!float 1e1
+  pixel_criterion: l1   # l1 / cb
+  pixel_weight: 1 # !!float 1e-2
+  feature_criterion: l1 # l1 / cb
+  feature_weight: !!float 1e-1
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 
@@ -122,5 +122,4 @@ logger:
 # server tensor board
 # PC: ssh -L 16006:localhost:6006 icsp@166.104.36.34
 # server: tensorboard --logdir sda/VSR/Proposed/tb_logger
-# cd sda/VSR/Proposed/codes
 
