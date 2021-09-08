@@ -54,9 +54,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~
+  pretrain_model_DRB: ../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_l1_1_TP150000_x4/models/160000_G.pth
   strict_load: true
-  resume_state: ~
+  resume_state: ../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_l1_1_TP150000_x4/training_state/160000.state
 
 #### training settings: learning rate scheme, loss
 train:
