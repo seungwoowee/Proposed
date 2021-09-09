@@ -1,7 +1,7 @@
 #### general settings
-name: DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-1_TP40000_x10
+name: DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_cb_1e-3_TP40000_x10
 use_tb_logger: true
-model: DRB
+model: DRB_nowarp
 distortion: sr
 scale: 4
 gpu_ids: [1]
@@ -53,9 +53,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_new2/models/80000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_cb_1e-1_TP40000_x10/models/55000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB_SR_new2/training_state/80000.state
+  resume_state: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_cb_1e-1_TP40000_x10/training_state/55000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -93,9 +93,9 @@ train:
 
   lr_gamma: 0.5
 
-  pixel_criterion: l1   # l1 / cb
+  pixel_criterion: cb   # l1 / cb
   pixel_weight: 1 # !!float 1e-2
-  feature_criterion: l1 # l1 / cb
+  feature_criterion: cb # l1 / cb
   feature_weight: !!float 1e-1
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3

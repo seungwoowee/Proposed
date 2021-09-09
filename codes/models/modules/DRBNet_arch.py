@@ -18,10 +18,8 @@ import cv2
 
 import torchvision.transforms as transforms
 
-
 import functools
 import models.modules.module_util as mutil
-
 
 
 def load_image(path):
@@ -42,6 +40,13 @@ def show_PIL_image(imgs):
         dst.paste(img, (0, img.height * (i + 1)))
 
     return dst
+
+
+def flow_cal(ref_img, src_img, model):
+    padder = InputPadder(ref_img.shape)
+    ref_img, src_img = padder.pad(ref_img, src_img)
+    _, flow = model(ref_img, src_img, iters=12, test_mode=True)
+    return padder.unpad(flow)
 
 
 def flow_cal_backwarp(ref_img, src_img, model):
@@ -92,7 +97,7 @@ flow_args = flow_parser.parse_args()
 
 class ResModule(nn.Module):
     def __init__(self, inout_ch, kernel_size=3, bias=False, bn=False,
-                 act=nn.LeakyReLU(negative_slope=0.2, inplace=True), res_scale=1):
+                 act=nn.LeakyReLU(negative_slope=0.1, inplace=True), res_scale=1):
         super(ResModule, self).__init__()
         module_temp = []
         for i in range(2):
@@ -117,7 +122,7 @@ class ResModule(nn.Module):
 
 class ResModule_down(nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size=3, bias=False, bn=False,
-                 act=nn.LeakyReLU(negative_slope=0.2, inplace=True), res_scale=1):
+                 act=nn.LeakyReLU(negative_slope=0.1, inplace=True), res_scale=1):
         super(ResModule_down, self).__init__()
         module_temp_down = [nn.Conv2d(in_channels=in_ch, out_channels=in_ch, kernel_size=kernel_size, stride=2,
                                       padding=(kernel_size // 2), bias=bias), act]
@@ -196,7 +201,7 @@ class CALayer(nn.Module):
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv_du = nn.Sequential(
             nn.Conv2d(inout_ch, inout_ch // ch_reduction_ratio, 1, padding=0, bias=True),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
             nn.Conv2d(inout_ch // ch_reduction_ratio, inout_ch, 1, padding=0, bias=True),
             nn.Sigmoid()
         )
@@ -242,7 +247,7 @@ class img_to_feat(nn.Module):
         super(img_to_feat, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, bias=use_bias),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
             nn.Conv2d(in_channels=out_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, bias=use_bias)
         )
 
@@ -264,12 +269,12 @@ class DRBNet_mid(nn.Module):
         self.GMA_model.eval()
         ###########################################################
 
-        use_act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        use_act = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         use_bias = True
         use_bn = False
 
         res_scale = 0.1
-        block_n = 3
+        block_n = 4
 
         in_ch = 64
         ch_reduction_ratio = 16
@@ -289,13 +294,12 @@ class DRBNet_mid(nn.Module):
             for _ in range(block_n)]
         self.U_net1 = nn.Sequential(*module_U_net1)
 
-
         self.upsample1 = PixelShufflePack(in_channels=mid_ch, out_channels=mid_ch)
         self.upsample2 = PixelShufflePack(in_channels=mid_ch, out_channels=mid_ch)
 
         self.HRconv = nn.Conv2d(in_channels=mid_ch, out_channels=mid_ch, kernel_size=3, stride=1, padding=1,
                                 bias=use_bias)
-        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.conv_out = nn.Conv2d(in_channels=mid_ch, out_channels=3, kernel_size=3, stride=1, padding=1,
                                   bias=use_bias)
         self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)
@@ -335,9 +339,9 @@ class DRBNet_mid(nn.Module):
         x2 = self.CA(x2) + x2
         x3 = self.CA(x3) + x3
 
-        out = self.conv_1d(torch.cat((x1, x2, x3), 1))       # in_ch -> mid_ch
+        out = self.conv_1d(torch.cat((x1, x2, x3), 1))  # in_ch -> mid_ch
 
-        out = self.U_net1(out)
+        out = self.U_net1(out) + out
 
         out = self.upsample1(out)  # conv shuffle lrelu
         out = self.upsample2(out)  # conv shuffle lrelu
@@ -346,3 +350,146 @@ class DRBNet_mid(nn.Module):
         src_img = self.img_upsample_x4(src_img)
         out += src_img
         return out
+
+
+class U_shaped_Net_with_CA_dense_nowarp(nn.Module):
+    def __init__(self, in_ch, out_ch, bias, bn, act, res_scale, ch_reduction_ratio):
+        super(U_shaped_Net_with_CA_dense_nowarp, self).__init__()
+        self.resB_down1 = ResModule_down(in_ch=in_ch, out_ch=4 * in_ch, bias=bias, bn=bn, act=act, res_scale=res_scale)
+        self.resB_down2 = ResModule_down(in_ch=4 * in_ch, out_ch=16 * in_ch, bias=bias, bn=bn, act=act,
+                                         res_scale=res_scale)
+        self.deconv3 = nn.ConvTranspose2d(16 * in_ch, 4 * in_ch, 3, stride=2, padding=1)
+
+        self.resB4 = ResModule(inout_ch=8 * in_ch, bias=bias, bn=bn, act=act, res_scale=res_scale)
+        self.deconv5 = nn.ConvTranspose2d(8 * in_ch, 2 * in_ch, 3, stride=2, padding=1)
+        self.resB6 = ResModule(inout_ch=3 * in_ch, bias=bias, bn=bn, act=act, res_scale=res_scale)
+        self.CA = CALayer(inout_ch=3 * in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.conv_out = nn.Conv2d(in_channels=4 * in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=False)
+
+    def forward(self, x):
+        out = self.resB_down1(x)
+        cat = out
+        out = self.resB_down2(out)
+        out = self.deconv3(out, output_size=[out.size(0), out.size(1), out.size(2) * 2, out.size(3) * 2])
+        out = torch.cat((cat, out), 1)
+        out = self.resB4(out)
+        out = self.deconv5(out, output_size=[out.size(0), out.size(1), out.size(2) * 2, out.size(3) * 2])
+        out = torch.cat((x, out), 1)
+        out = self.resB6(out)
+        out = self.CA(out)
+        out = self.conv_out(torch.cat((out, x), 1))
+
+        return out
+
+class DRBNet_mid_nowarp(nn.Module):
+    def __init__(self):
+        super(DRBNet_mid_nowarp, self).__init__()
+
+        ### optical flow: GMA   ###################################
+        self.GMA_model = torch.nn.DataParallel(RAFTGMA(flow_args))
+        self.GMA_model.load_state_dict(torch.load(flow_args.model))
+        self.GMA_model = self.GMA_model.module
+        self.GMA_model.to('cuda')
+        self.GMA_model.eval()
+        ###########################################################
+
+        use_act = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        use_bias = True
+        use_bn = False
+
+        res_scale = 0.1
+        block_n = 1
+
+        in_ch = 64
+        ch_reduction_ratio = 16
+        self.in_feat0 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat1 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat2 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat3 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat4 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
+
+        self.CA0 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+        mid_ch = in_ch * 2
+
+        module_U_net = [
+            U_shaped_Net_with_CA_dense_nowarp(in_ch=mid_ch, out_ch=in_ch, bias=use_bias, bn=use_bn, act=use_act,
+                                       res_scale=res_scale, ch_reduction_ratio=ch_reduction_ratio)
+            for _ in range(block_n)]
+
+        self.U_net0 = nn.Sequential(*module_U_net)
+        self.U_net1 = nn.Sequential(*module_U_net)
+        self.U_net2 = nn.Sequential(*module_U_net)
+        self.U_net3 = nn.Sequential(*module_U_net)
+
+        self.conv_1d = nn.Conv2d(in_channels=in_ch * 4, out_channels=mid_ch, kernel_size=1, stride=1, padding=0,
+                                 bias=use_bias)
+
+        self.upsample1 = PixelShufflePack(in_channels=mid_ch, out_channels=mid_ch)
+        self.upsample2 = PixelShufflePack(in_channels=mid_ch, out_channels=mid_ch)
+
+        self.HRconv = nn.Conv2d(in_channels=mid_ch, out_channels=mid_ch, kernel_size=3, stride=1, padding=1,
+                                bias=use_bias)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        self.conv_out = nn.Conv2d(in_channels=mid_ch, out_channels=3, kernel_size=3, stride=1, padding=1,
+                                  bias=use_bias)
+        self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)
+
+        util.initialize_weights(
+            [self.in_feat0, self.in_feat1, self.in_feat2, self.in_feat3, self.in_feat4, self.CA0, self.CA1, self.CA2,
+             self.CA3, self.CA4, self.U_net0, self.U_net1, self.U_net2, self.U_net3, self.conv_1d, self.upsample1,
+             self.upsample2, self.HRconv, self.conv_out])
+        util.initialize_weights([self.U_net1], scale=0.1)
+
+    def forward(self, x):
+        src_img = x[2]
+
+        ref_img = x[0]
+        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
+        x0 = torch.cat((ref_img, flow_, x[2]), 1)
+
+        ref_img = x[1]
+        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
+        x1 = torch.cat((ref_img, flow_, x[2]), 1)
+
+        ref_img = x[3]
+        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
+        x3 = torch.cat((ref_img, flow_, x[2]), 1)
+
+        ref_img = x[4]
+        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
+        x4 = torch.cat((ref_img, flow_, x[2]), 1)
+
+        x0 = self.in_feat0(x0)
+        x1 = self.in_feat1(x1)
+        x2 = self.in_feat2(x[2])
+        x3 = self.in_feat3(x3)
+        x4 = self.in_feat4(x4)
+
+        ## show image
+        # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
+
+        x0 = self.CA0(x0) + x0
+        x1 = self.CA1(x1) + x1
+        x2 = self.CA2(x2) + x2
+        x3 = self.CA3(x3) + x3
+        x4 = self.CA4(x4) + x4
+
+        out0 = self.U_net0(torch.cat((x2, x0), 1))
+        out1 = self.U_net1(torch.cat((out0, x1), 1))
+        out2 = self.U_net2(torch.cat((out1, x3), 1))
+        out3 = self.U_net3(torch.cat((out2, x4), 1))
+        out = self.conv_1d(torch.cat((out0, out1, out2, out3), 1))
+        out = self.upsample1(out)  # conv shuffle lrelu
+        out = self.upsample2(out)  # conv shuffle lrelu
+
+        out = self.conv_out(self.lrelu(self.HRconv(out)))
+        src_img = self.img_upsample_x4(src_img)
+        out += src_img
+        return out
+

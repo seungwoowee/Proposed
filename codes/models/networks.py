@@ -90,10 +90,8 @@ def define_DRB(opt):
     which_model = opt_net['which_model_DRB']
     if which_model == 'DRB_mid':
         net = DRBNet_arch.DRBNet_mid()
-    elif which_model == 'DRB_side_1st':
-        net = DRBNet_arch.DRBNet_side_1st()
-    elif which_model == 'DRB_side_2nd':
-        net = DRBNet_arch.DRBNet_side_2nd()
+    elif which_model == 'DRB_nowarp':
+        net = DRBNet_arch.DRBNet_mid_nowarp()
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net
