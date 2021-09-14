@@ -273,11 +273,11 @@ class DRBNet_mid(nn.Module):
 
         in_ch = 64
         ch_reduction_ratio = 16
-        self.in_feat0 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat1 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat0 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat1 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
         self.in_feat2 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat3 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat4 = img_to_feat(in_ch=8, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat3 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
+        self.in_feat4 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
 
         self.CA = CALayer(inout_ch=5 * in_ch, ch_reduction_ratio=ch_reduction_ratio)
 
@@ -310,29 +310,11 @@ class DRBNet_mid(nn.Module):
         util.initialize_weights([self.U_net], scale=0.1)
 
     def forward(self, x):
-        src_img = x[2]
-
-        ref_img = x[0]
-        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        x0 = torch.cat((ref_img, flow_, x[2]), 1)
-
-        ref_img = x[1]
-        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        x1 = torch.cat((ref_img, flow_, x[2]), 1)
-
-        ref_img = x[3]
-        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        x3 = torch.cat((ref_img, flow_, x[2]), 1)
-
-        ref_img = x[4]
-        flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        x4 = torch.cat((ref_img, flow_, x[2]), 1)
-
-        x0 = self.in_feat0(x0)
-        x1 = self.in_feat1(x1)
+        x0 = self.in_feat0(x[0])
+        x1 = self.in_feat1(x[1])
         x2 = self.in_feat2(x[2])
-        x3 = self.in_feat3(x3)
-        x4 = self.in_feat4(x4)
+        x3 = self.in_feat3(x[3])
+        x4 = self.in_feat4(x[4])
 
         ## show image
         # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
@@ -345,6 +327,6 @@ class DRBNet_mid(nn.Module):
         out = self.upsample2(out)  # conv shuffle lrelu
 
         out = self.conv_out(self.lrelu(self.HRconv(out)))
-        src_img = self.img_upsample_x4(src_img)
+        src_img = self.img_upsample_x4(x[2])
         out += src_img
         return out
