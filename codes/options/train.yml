@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4
+name: DRB_SR_NEW_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -53,9 +53,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e1_TP40000_x10/models/30000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/models/90000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e1_TP40000_x10/training_state/30000.state
+  resume_state: ~ #../experiments/DRB_SR_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/training_state/90000.state
 
 #### training settings: learning rate scheme, loss
 train:
