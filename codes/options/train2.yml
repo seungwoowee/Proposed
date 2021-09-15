@@ -1,24 +1,24 @@
 #### general settings
-name: DRB_SR_NEW_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e-2_TP150000_x4
+name: DRB_SR_GT_512_block_n_4_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-1_TP150000_x4
 use_tb_logger: true
-model: DRB
+model: DRB_nowarp
 distortion: sr
 scale: 4
-gpu_ids: [0]
+gpu_ids: [1]
 
 #### datasets
 datasets:
   train:
     name: train
-    mode: DRB_no_patch  # DRB
+    mode: DRB # DRB / DRB_no_patch
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
     dataroot_GT: ../../../datasets/REDS_jpg/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
     dataroot_LR: ../../../datasets/REDS_jpg/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 1
-    GT_size: 256
+    batch_size: 8
+    GT_size: 512
     use_flip: true
     use_rot: true
     color: RGB
@@ -53,9 +53,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e-2_TP150000_x4/models/90000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_cb_1e-3_TP40000_x10/models/60000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB_SR_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_l1_1e-2_TP150000_x4/training_state/90000.state
+  resume_state: ~ #../experiments/DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_cb_1e-3_TP40000_x10/training_state/60000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -80,7 +80,7 @@ train:
   #  # MultiStepLR_Restart
   #  lr_scheme: MultiStepLR_Restart
   #  lr_steps: [50000, 100000, 200000, 300000]
-  #  restarts: [50000, 150000, 350000]
+  #  restarts: [250000, 500000, 750000]
   #  restart_weights: [1, 1, 1]
 
   #  # CosineAnnealingLR_Restart
@@ -90,15 +90,14 @@ train:
   restarts: [150000, 300000, 450000]
   restart_weights: [1, 1, 1]
   eta_min: 0
+  eta_min: 0
 
   lr_gamma: 0.5
 
-  pixel_criterion: cb   # l1
-  pixel_weight: !!float 1e-3  # 1
-
-  feature_criterion: l1
-  feature_weight: !!float 1e-2
-
+  pixel_criterion: l1   # l1 / cb
+  pixel_weight: 1 # !!float 1e-2
+  feature_criterion: l1 # l1 / cb
+  feature_weight: !!float 1e-1
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 
@@ -124,5 +123,4 @@ logger:
 # server tensor board
 # PC: ssh -L 16006:localhost:6006 icsp@166.104.36.34
 # server: tensorboard --logdir sda/VSR/Proposed/tb_logger
-# cd sda/VSR/Proposed/codes
 
