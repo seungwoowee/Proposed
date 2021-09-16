@@ -28,7 +28,7 @@ def init_dist(backend='nccl', **kwargs):
 def main():
     #### options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, default='options/train.yml', help='Path to option YMAL file.')
+    parser.add_argument('-opt', type=str, default='options/train_RCAN.yml', help='Path to option YMAL file.')
     parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none',
                         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
@@ -194,13 +194,6 @@ def main():
                 idx = 0
                 for val_data in val_loader:
                     idx += 1
-                    if opt['datasets']['val']['position'] == 'mid':
-                        file_idx = 2
-                    elif opt['datasets']['val']['position'] == 'side_2nd':
-                        file_idx = 1
-                    elif opt['datasets']['val']['position'] == 'side_1st':
-                        file_idx = 0
-
                     model.feed_data(val_data)
                     model.test()
 
@@ -209,17 +202,11 @@ def main():
                     gt_img = util.tensor2img(visuals['GT'])  # uint8
 
                     # Save SR images for reference
-                    if opt['position'] == 'mid':
-                        file_idx = 2
-                    elif opt['position'] == 'side_2nd':
-                        file_idx = 1
-                    elif opt['position'] == 'side_1st':
-                        file_idx = 0
-                    img_name = os.path.splitext(os.path.basename(val_data['LR_path'][file_idx][0]))[0]
+                    img_name = os.path.splitext(os.path.basename(val_data['LQ_path'][0]))[0]
                     img_dir = opt['path']['val_images']
                     util.mkdir(img_dir)
                     save_img_path = os.path.join(img_dir, '{:s}_{:s}_{:d}.png'.format(
-                        val_data['LR_path'][file_idx][0].split('\\')[-2], img_name, current_step))
+                        val_data['LQ_path'][0].split('\\')[-2], img_name, current_step))
                     util.save_img(sr_img, save_img_path)
 
                     # calculate PSNR

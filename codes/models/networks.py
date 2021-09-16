@@ -5,6 +5,8 @@ import models.modules.SRResNet_arch as SRResNet_arch
 import models.modules.discriminator_vgg_arch as SRGAN_arch
 import models.modules.RRDBNet_arch as RRDBNet_arch
 import models.modules.DRBNet_arch as DRBNet_arch
+import models.modules.RCAN_arch as RCAN_arch
+
 logger = logging.getLogger('base')
 
 
@@ -20,7 +22,6 @@ class ResidualBlock(nn.Module):
         residual = self.prelu(residual)
         residual = self.conv2(residual)
         return x + residual
-
 
 
 class Generator(nn.Module):
@@ -40,7 +41,7 @@ class Generator(nn.Module):
     def forward(self, x, z):
         # noise_map = self.high_pass(noise_img)
         # concat_input = torch.cat([x, noise_map], dim=1)
-        z =  z.expand(x.shape)
+        z = z.expand(x.shape)
         block = self.block_input(z)
         for res_block in self.res_blocks:
             block = res_block(block)
@@ -48,6 +49,7 @@ class Generator(nn.Module):
         # out = torch.tanh(block) * self.noise_level + x
         # noise = torch.sigmoid(block)
         return torch.clamp(x + noise, 0, 1), noise
+
 
 ####################
 # define network
@@ -61,8 +63,10 @@ def define_G(opt):
         netG = SRResNet_arch.MSRResNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
                                        nf=opt_net['nf'], nb=opt_net['nb'], upscale=opt_net['scale'])
     elif which_model == 'RRDBNet':
-        netG = RRDBNet_arch.RRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
-                                    nf=opt_net['nf'], nb=opt_net['nb'])
+        netG = RRDBNet_arch.RCAN(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], nb=opt_net['nb'])
+    elif which_model == 'RCAN':
+        netG = RCAN_arch.RRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
+                                 nf=opt_net['nf'], nb=opt_net['nb'])
     # elif which_model == 'sft_arch':  # SFT-GAN
     #     netG = sft_arch.SFT_Net()
     else:
@@ -97,6 +101,21 @@ def define_DRB(opt):
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net
+
+
+## RCAN
+def define_RCAN(opt):
+    opt_net = opt['network_RCAN']
+    which_model = opt_net['which_model_RCAN']
+    if which_model == 'RCAN':
+        net = RCAN_arch.RCAN(n_resgroups=opt_net['n_resgroups'], n_resblocks=opt_net['n_resblocks'],
+                             n_feats=opt_net['n_feats'], reduction=opt_net['reduction'], scale=opt_net['scale'],
+                             rgb_range=opt_net['rgb_range'], n_colors=opt_net['n_colors'],
+                             res_scale=opt_net['res_scale'])
+    else:
+        raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('RCAN'))
+    return net
+
 
 #### Define Network used for Perceptual Loss
 def define_F(opt, use_bn=False):

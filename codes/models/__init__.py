@@ -6,6 +6,8 @@ def create_model(opt):
     model = opt['model']
     if model == 'DRB':
         from .DRB_model import DRBModel as M
+    elif model == 'RCAN':
+        from .RCAN_model import RCANModel as M
     elif model == 'sr':
         from .SR_model import SRModel as M
     elif model == 'srgan':

@@ -1,8 +1,8 @@
 #### general settings
-name: DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4
+name: RCAN
 
 use_tb_logger: true
-model: DRB
+model: RCAN
 distortion: sr
 scale: 4
 gpu_ids: [0]
@@ -11,27 +11,27 @@ gpu_ids: [0]
 datasets:
   train:
     name: train
-    mode: DRB_no_patch  # DRB
+    mode: LQGT  # DRB / DRB_no_patch / LQGT / ...
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
     dataroot_GT: D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
-    dataroot_LR: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
+    dataroot_LQ: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 1
-    GT_size: 256
+    batch_size: 16
+    GT_size: 192
     use_flip: true
     use_rot: true
     color: RGB
-    data_type: seq
+    data_type: img
     position: mid # side_1st // side 2nd // mid
     ref_frame_num: 5 # 3 / 5 / 7 ...
   val:
     name: val
-    mode: DRB
+    mode: LQGT
     dataroot_GT: D:/REDS/val_sharp # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
-    dataroot_LR: D:/REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
-    data_type: seq
+    dataroot_LQ: D:/REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
+    data_type: img
     position: mid # side_1st // side 2nd // mid
     ref_frame_num: 5 # 3 / 5 / 7 ...
 
@@ -43,53 +43,60 @@ network_G:
   nf: 64
   nb: 23
 
-network_D:
-  which_model_D: discriminator_vgg_128
-  in_nc: 3
-  nf: 64
 
-network_DRB:
-  which_model_DRB: DRB_mid # DRB_1st // DRB_2nd
+network_RCAN:
+  which_model_RCAN: RCAN
+  n_resgroups: 10
+  n_resblocks: 20
+  n_feats: 64
+  reduction: 16
+  scale: 4
+  rgb_range: 255
+  n_colors: 3
+  res_scale: 1
+  shift_mean: True
+  precision: single
+  gan_k: 1  # k value for adversarial loss
+
+
 
 #### path
 path:
-  pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/models/160000_G.pth
+  pretrain_model_RCAN: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/models/160000_G.pth
   strict_load: true
   resume_state: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/training_state/160000.state
 
 #### training settings: learning rate scheme, loss
 train:
-  lr_G: !!float 1e-4
-  weight_decay_G: 0
-  beta1_G: 0.9
-  beta2_G: 0.999
-
-  lr_D: !!float 1e-4
-  weight_decay_D: 0
-  beta1_D: 0.9
-  beta2_D: 0.999
-
-  lr_DRB: !!float 1e-4
-  weight_decay_DRB: 0
-  beta1_DRB: 0.9
-  beta2_DRB: 0.999
+  lr_RCAN: !!float 1e-4
+  lr_decay: 200
+  weight_decay_RCAN: 0
+  beta1_RCAN: 0.9
+  beta2_RCAN: 0.999
+  epsilon: !!float 1e-8
 
   niter: 600001
   warmup_iter: -1  # no warm up
 
-#  # MultiStepLR_Restart
-#  lr_scheme: MultiStepLR_Restart
+  # MultiStepLR_Restart
+  lr_scheme: step_RCAN  # learning rate decay type
+  lr_steps: [200000, 400000, 600000, 800000]
+  restarts: ~
+  restart_weights: ~
+  gamma: 0.5  # 'learning rate decay factor for step decay'
+
+
+
 #  lr_steps: [50000, 100000, 200000, 300000]
 #  restarts: [250000, 500000, 750000]
 #  restart_weights: [1, 1, 1]
 
 #  # CosineAnnealingLR_Restart
-  lr_scheme: CosineAnnealingLR_Restart
-  # four
-  T_period: [150000, 150000, 150000, 150000]
-  restarts: [150000, 300000, 450000]
-  restart_weights: [1, 1, 1]
+#  lr_scheme: CosineAnnealingLR_Restart
+#  # four
+#  T_period: [150000, 150000, 150000, 150000]
+#  restarts: [150000, 300000, 450000]
+#  restart_weights: [1, 1, 1]
 #  T_period: [ 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000 ]
 #  restarts: [ 30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000 ]
 #  restart_weights: [ 1, 1, 1, 1, 1, 1, 1, 1, 1 ]
@@ -97,19 +104,20 @@ train:
 
   lr_gamma: 0.5
 
-  pixel_criterion: cb   # l1
-  pixel_weight: !!float 1e-2  # 1
+  pixel_criterion: l1   # l1
+  pixel_weight: 1  # 1
 
-  feature_criterion: l1
-  feature_weight: !!float 1e-1  # 1
+  feature_criterion: 0
+  feature_weight: 0 #!!float 1e-1  # 1
 
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
+  skip_threshold: !!float 1e6 # skipping batch that has large error
 
   D_update_ratio: 1
   D_init_iters: 0
 
-  manual_seed: 10
+  manual_seed: 1
   val_freq: !!float 5e3
 
 #### logger
