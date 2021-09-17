@@ -108,18 +108,17 @@ def main():
             # print('\n\n\n\n\n\n\n\n', dataset_opt)
             train_set = create_dataset(dataset_opt)
             train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
-            total_iters = int(opt['train']['niter'])
-            total_epochs = int(math.ceil(total_iters / train_size))
+            total_epochs = int(opt['train']['total_epochs'])
+            total_iters = train_size * total_epochs
             if opt['dist']:
                 train_sampler = DistIterSampler(train_set, world_size, rank, dataset_ratio)
-                total_epochs = int(math.ceil(total_iters / (train_size * dataset_ratio)))
             else:
                 train_sampler = None
             train_loader = create_dataloader(train_set, dataset_opt, opt, train_sampler)
             if rank <= 0:
                 logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                     len(train_set), train_size))
-                logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
+                logger.info('Total epochs needed: {:,d} for iters {:,d}'.format(
                     total_epochs, total_iters))
         elif phase == 'val':
             val_set = create_dataset(dataset_opt)
@@ -153,15 +152,13 @@ def main():
             train_sampler.set_epoch(epoch)
         for _, train_data in enumerate(train_loader):
             current_step += 1
-            if current_step > total_iters:
-                break
+            # if current_step > total_iters:
+            #     break
 
             #### training
             model.feed_data(train_data)
             model.optimize_parameters(current_step)
 
-            #### update learning rate
-            model.update_learning_rate(current_step, warmup_iter=opt['train']['warmup_iter'])
             #### log
             if current_step % opt['logger']['print_freq'] == 0:
                 logs = model.get_current_log()
@@ -175,8 +172,8 @@ def main():
                             tb_logger.add_scalar(k, v, current_step)
 
                 visuals = model.get_current_visuals()
-                sr_img = util.tensor2img(visuals['SR'])  # uint8
-                gt_img = util.tensor2img(visuals['GT'])  # uint8
+                sr_img = util.tensor2img(visuals['SR']/255)  # uint8
+                gt_img = util.tensor2img(visuals['GT']/255)  # uint8
 
                 # calculate PSNR
                 sr_img = sr_img / 255.
@@ -198,8 +195,8 @@ def main():
                     model.test()
 
                     visuals = model.get_current_visuals()
-                    sr_img = util.tensor2img(visuals['SR'])  # uint8
-                    gt_img = util.tensor2img(visuals['GT'])  # uint8
+                    sr_img = util.tensor2img(visuals['SR']/255)  # uint8
+                    gt_img = util.tensor2img(visuals['GT']/255)  # uint8
 
                     # Save SR images for reference
                     img_name = os.path.splitext(os.path.basename(val_data['LQ_path'][0]))[0]
@@ -240,6 +237,8 @@ def main():
                     logger.info('Saving models and training states.')
                     model.save(current_step)
                     model.save_training_state(epoch, current_step)
+        #### update learning rate
+        model.update_learning_rate()
 
     if rank <= 0:
         logger.info('Saving the final model.')

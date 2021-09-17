@@ -3,6 +3,7 @@ from models.modules import module_util
 import torch.nn as nn
 import torch
 
+
 def make_model(args, parent=False):
     return RCAN(args)
 
@@ -67,9 +68,11 @@ class ResidualGroup(nn.Module):
         res += x
         return res
 
+
 ## Residual Channel Attention Network (RCAN)
 class RCAN(nn.Module):
-    def __init__(self, n_resgroups, n_resblocks, n_feats, reduction, scale, rgb_range, n_colors, res_scale, conv=module_util.default_conv):
+    def __init__(self, n_resgroups, n_resblocks, n_feats, reduction, scale, rgb_range, n_colors, res_scale,
+                 conv=module_util.default_conv):
         super(RCAN, self).__init__()
         kernel_size = 3
         act = nn.ReLU(True)

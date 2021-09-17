@@ -10,47 +10,6 @@ import models.modules.RCAN_arch as RCAN_arch
 logger = logging.getLogger('base')
 
 
-class ResidualBlock(nn.Module):
-    def __init__(self, channels):
-        super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
-        self.prelu = nn.PReLU()
-        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
-
-    def forward(self, x):
-        residual = self.conv1(x)
-        residual = self.prelu(residual)
-        residual = self.conv2(residual)
-        return x + residual
-
-
-class Generator(nn.Module):
-    def __init__(self, n_res_blocks=8):
-        super(Generator, self).__init__()
-        self.block_input = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, padding=1),
-            nn.PReLU()
-        )
-        self.res_blocks = nn.ModuleList([ResidualBlock(64) for _ in range(n_res_blocks)])
-        self.block_output = nn.Conv2d(64, 3, kernel_size=3, padding=1)
-        # for k, v in self.features.named_parameters():
-        #     v.requires_grad = False
-        # self.high_pass = FilterHigh(kernel_size=5)
-        # self.noise_level = 1
-
-    def forward(self, x, z):
-        # noise_map = self.high_pass(noise_img)
-        # concat_input = torch.cat([x, noise_map], dim=1)
-        z = z.expand(x.shape)
-        block = self.block_input(z)
-        for res_block in self.res_blocks:
-            block = res_block(block)
-        noise = self.block_output(block)
-        # out = torch.tanh(block) * self.noise_level + x
-        # noise = torch.sigmoid(block)
-        return torch.clamp(x + noise, 0, 1), noise
-
-
 ####################
 # define network
 ####################
@@ -88,6 +47,21 @@ def define_D(opt):
     return netD
 
 
+#### Define Network used for Perceptual Loss
+def define_F(opt, use_bn=False):
+    gpu_ids = opt['gpu_ids']
+    device = torch.device('cuda' if gpu_ids else 'cpu')
+    # PyTorch pretrained VGG19-54, before ReLU.
+    if use_bn:
+        feature_layer = 49
+    else:
+        feature_layer = 34
+    netF = SRGAN_arch.VGGFeatureExtractor(feature_layer=feature_layer, use_bn=use_bn,
+                                          use_input_norm=True, device=device)
+    netF.eval()  # No need to train
+    return netF
+
+
 #### My model
 def define_DRB(opt):
     opt_net = opt['network_DRB']
@@ -106,7 +80,7 @@ def define_DRB(opt):
 ## RCAN
 def define_RCAN(opt):
     opt_net = opt['network_RCAN']
-    which_model = opt_net['which_model_RCAN']
+    which_model = opt_net['which_model']
     if which_model == 'RCAN':
         net = RCAN_arch.RCAN(n_resgroups=opt_net['n_resgroups'], n_resblocks=opt_net['n_resblocks'],
                              n_feats=opt_net['n_feats'], reduction=opt_net['reduction'], scale=opt_net['scale'],
@@ -115,18 +89,3 @@ def define_RCAN(opt):
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('RCAN'))
     return net
-
-
-#### Define Network used for Perceptual Loss
-def define_F(opt, use_bn=False):
-    gpu_ids = opt['gpu_ids']
-    device = torch.device('cuda' if gpu_ids else 'cpu')
-    # PyTorch pretrained VGG19-54, before ReLU.
-    if use_bn:
-        feature_layer = 49
-    else:
-        feature_layer = 34
-    netF = SRGAN_arch.VGGFeatureExtractor(feature_layer=feature_layer, use_bn=use_bn,
-                                          use_input_norm=True, device=device)
-    netF.eval()  # No need to train
-    return netF
