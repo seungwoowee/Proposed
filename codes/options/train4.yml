@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-2_TP150000_x4
+name: DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_l1_1e3_cri_fea_l1_1_TP600000_x4
 use_tb_logger: true
 model: DRB_nowarp
 distortion: sr
@@ -86,18 +86,17 @@ train:
   #  # CosineAnnealingLR_Restart
   lr_scheme: CosineAnnealingLR_Restart
   # four
-  T_period: [150000, 150000, 150000, 150000]
-  restarts: [150000, 300000, 450000]
-  restart_weights: [1, 1, 1]
-  eta_min: 0
+  T_period: [600000, 600000, 600000, 600000]
+  restarts: [600000, 1200000, 180000]
+  restart_weights: [1, 0.5, 0.25]
   eta_min: 0
 
   lr_gamma: 0.5
 
   pixel_criterion: l1   # l1 / cb
-  pixel_weight: 1 # !!float 1e-2
+  pixel_weight: !!float 1e3 # !!float 1e-2
   feature_criterion: l1 # l1 / cb
-  feature_weight: !!float 1e-2
+  feature_weight: 1
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 

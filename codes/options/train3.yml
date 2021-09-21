@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_cb_1e-5_TP150000_x4
+name: DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_cb_1e-5_TP600000_x4
 use_tb_logger: true
 model: DRB_nowarp
 distortion: sr
@@ -53,9 +53,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ../experiments/DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_cb_1e-5_TP150000_x4/models/60000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_cb_1e-5_TP150000_x4/models/60000_G.pth
   strict_load: true
-  resume_state: ../experiments/DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_cb_1e-5_TP150000_x4/training_state/60000.state
+  resume_state: ~ #../experiments/DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_cri_fea_cb_1e-5_TP150000_x4/training_state/60000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -86,10 +86,9 @@ train:
   #  # CosineAnnealingLR_Restart
   lr_scheme: CosineAnnealingLR_Restart
   # four
-  T_period: [150000, 150000, 150000, 150000]
-  restarts: [150000, 300000, 450000]
-  restart_weights: [1, 1, 1]
-  eta_min: 0
+  T_period: [600000, 600000, 600000, 600000]
+  restarts: [600000, 1200000, 180000]
+  restart_weights: [1, 0.5, 0.25]
   eta_min: 0
 
   lr_gamma: 0.5

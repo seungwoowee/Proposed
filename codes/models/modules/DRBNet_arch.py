@@ -370,20 +370,20 @@ class DRBNet_mid(nn.Module):
         x4 = self.in_feat4(x4)
 
         ###
-        x1 = self.U_net0(torch.cat((x0, x1, x2), 1))
+        x1 = self.U_net0(torch.cat((x0, x1, x2), 1))    # 3*ch
         x2 = self.U_net1(torch.cat((x1, x2, x3), 1))
         x3 = self.U_net2(torch.cat((x2, x3, x4), 1))
 
 
         ###
-        x1 = self.upsample0(x1)
+        x1 = self.upsample0(x1)     # 3*ch
         x2 = self.upsample1(x2)
         x3 = self.upsample2(x3)
 
         ###
-        x2 = self.U_net3(torch.cat((x1, x2, x3), 1))
+        x2 = self.U_net3(torch.cat((x1, x2, x3), 1))    # 9*ch
 
-        x2 = self.upsample2_x2(x2)
+        x2 = self.upsample3(x2)
         out = self.conv_out(self.lrelu(self.HRconv(x2)))
         src_img = self.img_upsample_x4(src_img)
         out += src_img
