@@ -122,5 +122,9 @@ logger:
 
 # server tensor board
 # PC: ssh -L 16006:localhost:6006 icsp@166.104.36.34
-# server: tensorboard --logdir sda/VSR/Proposed/tb_logger
+# server:
+#  conda activate Proposed
+#  tensorboard --logdir sda/VSR/Proposed/tb_logger
+#  cd sda/VSR/Proposed/codes
+
 

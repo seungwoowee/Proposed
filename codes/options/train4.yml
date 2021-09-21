@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_GT_256_block_n_4_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-1_TP150000_x4
+name: DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-2_TP150000_x4
 use_tb_logger: true
 model: DRB_nowarp
 distortion: sr
@@ -53,9 +53,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_cb_1e-3_TP40000_x10/models/60000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-1_TP150000_x4/models/5000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_cb_1e-3_TP40000_x10/training_state/60000.state
+  resume_state: ~ #../experiments/DRB_SR_GT_256_block_n_1_lrDRB_1e-4_pixelShuffle_pix_l1_1_cri_fea_l1_1e-1_TP150000_x4/training_state/5000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -97,7 +97,7 @@ train:
   pixel_criterion: l1   # l1 / cb
   pixel_weight: 1 # !!float 1e-2
   feature_criterion: l1 # l1 / cb
-  feature_weight: !!float 1e-1
+  feature_weight: !!float 1e-2
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 
@@ -122,5 +122,8 @@ logger:
 
 # server tensor board
 # PC: ssh -L 16006:localhost:6006 icsp@166.104.36.34
-# server: tensorboard --logdir sda/VSR/Proposed/tb_logger
+# server:
+#  conda activate Proposed
+#  tensorboard --logdir sda/VSR/Proposed/tb_logger
+#  cd sda/VSR/Proposed/codes
 

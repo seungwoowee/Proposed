@@ -304,40 +304,27 @@ class DRBNet_mid(nn.Module):
         self.in_feat4 = img_to_feat(in_ch=3, out_ch=ch, use_bias=use_bias)
 
         module_U_net = [
-            U_shaped_Net_with_CA_dense(in_ch=ch, out_ch=ch, bias=use_bias, bn=use_bn, act=use_act,
+            U_shaped_Net_with_CA_dense(in_ch=3 * ch, out_ch=3 * ch, bias=use_bias, bn=use_bn, act=use_act,
                                        res_scale=res_scale, ch_reduction_ratio=ch_reduction_ratio)
             for _ in range(block_n)]
 
         self.U_net0 = nn.Sequential(*module_U_net)
-        self.U_net4 = nn.Sequential(*module_U_net)
-        self.U_net0_x2 = nn.Sequential(*module_U_net)
-        self.U_net4_x2 = nn.Sequential(*module_U_net)
-
-        module_U_net = [
-            U_shaped_Net_with_CA_dense(in_ch=2 * ch, out_ch=2 * ch, bias=use_bias, bn=use_bn, act=use_act,
-                                       res_scale=res_scale, ch_reduction_ratio=ch_reduction_ratio)
-            for _ in range(block_n)]
         self.U_net1 = nn.Sequential(*module_U_net)
-        self.U_net3 = nn.Sequential(*module_U_net)
-        self.U_net1_x2 = nn.Sequential(*module_U_net)
-        self.U_net3_x2 = nn.Sequential(*module_U_net)
+        self.U_net2 = nn.Sequential(*module_U_net)
+
+        self.upsample0 = PixelShufflePack(in_channels=3 * ch, out_channels=3 * ch)
+        self.upsample1 = PixelShufflePack(in_channels=3 * ch, out_channels=3 * ch)
+        self.upsample2 = PixelShufflePack(in_channels=3 * ch, out_channels=3 * ch)
 
         module_U_net = [
-            U_shaped_Net_with_CA_dense(in_ch=5 * ch, out_ch=5 * ch, bias=use_bias, bn=use_bn, act=use_act,
+            U_shaped_Net_with_CA_dense(in_ch=9 * ch, out_ch=9 * ch, bias=use_bias, bn=use_bn, act=use_act,
                                        res_scale=res_scale, ch_reduction_ratio=ch_reduction_ratio)
             for _ in range(block_n)]
-        self.U_net2 = nn.Sequential(*module_U_net)
-        self.U_net2_x2 = nn.Sequential(*module_U_net)
+        self.U_net3 = nn.Sequential(*module_U_net)
 
-        self.upsample0 = PixelShufflePack(in_channels=ch, out_channels=ch)
-        self.upsample1 = PixelShufflePack(in_channels=2 * ch, out_channels=ch)
-        self.upsample2 = PixelShufflePack(in_channels=5 * ch, out_channels=ch)
-        self.upsample3 = PixelShufflePack(in_channels=2 * ch, out_channels=ch)
-        self.upsample4 = PixelShufflePack(in_channels=ch, out_channels=ch)
+        self.upsample3 = PixelShufflePack(in_channels=9 * ch, out_channels=9 * ch)
 
-        self.upsample2_x2 = PixelShufflePack(in_channels=5 * ch, out_channels=3 * ch)
-
-        self.HRconv = nn.Conv2d(in_channels=3 * ch, out_channels=ch, kernel_size=3, stride=1, padding=1,
+        self.HRconv = nn.Conv2d(in_channels=9 * ch, out_channels=ch, kernel_size=3, stride=1, padding=1,
                                 bias=use_bias)
         self.lrelu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.conv_out = nn.Conv2d(in_channels=ch, out_channels=3, kernel_size=3, stride=1, padding=1,
@@ -345,9 +332,9 @@ class DRBNet_mid(nn.Module):
         self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)
 
         util.initialize_weights(
-            [self.in_feat1, self.in_feat2, self.in_feat3, self.upsample1, self.upsample2,
-             self.HRconv, self.conv_out])
-        util.initialize_weights([self.U_net1], scale=0.1)
+            [self.in_feat0, self.in_feat1, self.in_feat2, self.in_feat3, self.in_feat4, self.upsample0, self.upsample1,
+             self.upsample2, self.upsample3, self.HRconv, self.conv_out])
+        util.initialize_weights([self.U_net0, self.U_net1, self.U_net2, self.U_net3], scale=0.1)
 
     def forward(self, x):
         src_img = x[2]
@@ -383,32 +370,21 @@ class DRBNet_mid(nn.Module):
         x4 = self.in_feat4(x4)
 
         ###
-        x0 = self.U_net0(x0)
-        x1 = self.U_net1(torch.cat((x0, x1), 1))
+        x1 = self.U_net0(torch.cat((x0, x1, x2), 1))
+        x2 = self.U_net1(torch.cat((x1, x2, x3), 1))
+        x3 = self.U_net2(torch.cat((x2, x3, x4), 1))
 
-        x4 = self.U_net4(x4)
-        x3 = self.U_net3(torch.cat((x4, x3), 1))
-
-        x2 = self.U_net2(torch.cat((x1, x2, x3), 1))
 
         ###
-        x0 = self.upsample0(x0)
-        x1 = self.upsample1(x1)
-        x2 = self.upsample2(x2)
-        x3 = self.upsample3(x3)
-        x4 = self.upsample4(x4)
+        x1 = self.upsample0(x1)
+        x2 = self.upsample1(x2)
+        x3 = self.upsample2(x3)
 
         ###
-        x0 = self.U_net0_x2(x0)
-        x1 = self.U_net1_x2(torch.cat((x0, x1), 1))
+        x2 = self.U_net3(torch.cat((x1, x2, x3), 1))
 
-        x4 = self.U_net4_x2(x4)
-        x3 = self.U_net3_x2(torch.cat((x4, x3), 1))
-
-        x2 = self.U_net2_x2(torch.cat((x1, x2, x3), 1))
         x2 = self.upsample2_x2(x2)
         out = self.conv_out(self.lrelu(self.HRconv(x2)))
         src_img = self.img_upsample_x4(src_img)
         out += src_img
         return out
-
