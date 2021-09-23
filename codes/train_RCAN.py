@@ -172,8 +172,8 @@ def main():
                             tb_logger.add_scalar(k, v, current_step)
 
                 visuals = model.get_current_visuals()
-                sr_img = util.tensor2img(visuals['SR']/255)  # uint8
-                gt_img = util.tensor2img(visuals['GT']/255)  # uint8
+                sr_img = util.tensor2img(visuals['SR'])  # uint8
+                gt_img = util.tensor2img(visuals['GT'])  # uint8
 
                 # calculate PSNR
                 sr_img = sr_img / 255.
@@ -195,8 +195,8 @@ def main():
                     model.test()
 
                     visuals = model.get_current_visuals()
-                    sr_img = util.tensor2img(visuals['SR']/255)  # uint8
-                    gt_img = util.tensor2img(visuals['GT']/255)  # uint8
+                    sr_img = util.tensor2img(visuals['SR'])  # uint8
+                    gt_img = util.tensor2img(visuals['GT'])  # uint8
 
                     # Save SR images for reference
                     img_name = os.path.splitext(os.path.basename(val_data['LQ_path'][0]))[0]

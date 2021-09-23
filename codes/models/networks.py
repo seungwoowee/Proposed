@@ -6,6 +6,7 @@ import models.modules.discriminator_vgg_arch as SRGAN_arch
 import models.modules.RRDBNet_arch as RRDBNet_arch
 import models.modules.DRBNet_arch as DRBNet_arch
 import models.modules.RCAN_arch as RCAN_arch
+import models.modules.EDSR_arch as EDSR_arch
 
 logger = logging.getLogger('base')
 
@@ -84,6 +85,19 @@ def define_RCAN(opt):
     if which_model == 'RCAN':
         net = RCAN_arch.RCAN(n_resgroups=opt_net['n_resgroups'], n_resblocks=opt_net['n_resblocks'],
                              n_feats=opt_net['n_feats'], reduction=opt_net['reduction'], scale=opt_net['scale'],
+                             rgb_range=opt_net['rgb_range'], n_colors=opt_net['n_colors'],
+                             res_scale=opt_net['res_scale'])
+    else:
+        raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('RCAN'))
+    return net
+
+
+def define_EDSR(opt):
+    opt_net = opt['network_EDSR']
+    which_model = opt_net['which_model']
+    if which_model == 'EDSR':
+        net = EDSR_arch.EDSR(n_resblocks=opt_net['n_resblocks'],
+                             n_feats=opt_net['n_feats'], scale=opt_net['scale'],
                              rgb_range=opt_net['rgb_range'], n_colors=opt_net['n_colors'],
                              res_scale=opt_net['res_scale'])
     else:
