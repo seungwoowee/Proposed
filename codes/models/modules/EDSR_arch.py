@@ -1,6 +1,7 @@
 from models.modules import module_util
 
 import torch.nn as nn
+import torch
 
 url = {
     'r16f64x2': 'https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt',
@@ -27,8 +28,9 @@ class EDSR(nn.Module):
             self.url = url[url_name]
         else:
             self.url = None
-        self.sub_mean = module_util.MeanShift(rgb_range)
-        self.add_mean = module_util.MeanShift(rgb_range, sign=1)
+        self.sub_mean = module_util.MeanShift(rgb_range, rgb_mean=(0.4488, 0.4371, 0.4040), rgb_std=(1.0, 1.0, 1.0))
+        self.add_mean = module_util.MeanShift(rgb_range, rgb_mean=(0.4488, 0.4371, 0.4040), rgb_std=(1.0, 1.0, 1.0),
+                                              sign=1)
 
         # define head module
         m_head = [conv(n_colors, n_feats, kernel_size)]
@@ -52,6 +54,7 @@ class EDSR(nn.Module):
         self.tail = nn.Sequential(*m_tail)
 
     def forward(self, x):
+        x = torch.stack(x)
         x = self.sub_mean(x)
         x = self.head(x)
 

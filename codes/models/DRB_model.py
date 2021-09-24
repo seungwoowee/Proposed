@@ -141,6 +141,8 @@ class DRBModel(BaseModel):
         self.optimizer_DRB.step()
 
         # set log
+        self.log_dict['l_g_pix'] = l_g_pix.item()
+        self.log_dict['l_g_fea'] = l_g_fea.item()
         self.log_dict['l_pix'] = l_total_total.item()
 
     def test(self):

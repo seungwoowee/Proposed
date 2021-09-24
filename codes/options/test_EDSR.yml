@@ -21,7 +21,7 @@ datasets:
 #### network structures
 network_EDSR:
   which_model: EDSR
-  n_resblocks: 20
+  n_resblocks: 16
   n_feats: 64
   scale: 4
   rgb_range: 255
@@ -33,7 +33,7 @@ network_EDSR:
 
 #### path
 path:
-  pretrain_model: ../pretrained_model/EDSR_x4.pt
+  pretrain_model: ../pretrained_model/edsr_baseline_x4-6b446fab.pt
   strict_load: true
   results_root: ../results
 

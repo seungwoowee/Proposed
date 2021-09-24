@@ -101,5 +101,5 @@ def define_EDSR(opt):
                              rgb_range=opt_net['rgb_range'], n_colors=opt_net['n_colors'],
                              res_scale=opt_net['res_scale'])
     else:
-        raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('RCAN'))
+        raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('EDSR'))
     return net

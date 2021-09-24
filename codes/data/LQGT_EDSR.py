@@ -60,7 +60,7 @@ class LQGTDataset(data.Dataset):
             resolution = [int(s) for s in self.sizes_GT[index].split('_')]
         else:
             resolution = None
-        img_GT = util.read_img(self.GT_env, GT_path, resolution)*255
+        img_GT = util.read_img(self.GT_env, GT_path, resolution)
         # modcrop in the validation / test phase
         if self.opt['phase'] != 'train':
             img_GT = util.modcrop(img_GT, scale)
@@ -131,8 +131,7 @@ class LQGTDataset(data.Dataset):
 
         # change color space if necessary
         if self.opt['color']:
-            img_LQ = util.channel_convert(C, self.opt['color'],
-                                          [img_LQ])[0]  # TODO during val no definition
+            img_LQ = util.channel_convert(C, self.opt['color'], [img_LQ])[0]  # TODO during val no definition
 
         # BGR to RGB, HWC to CHW, numpy to tensor
         if img_GT.shape[2] == 3:

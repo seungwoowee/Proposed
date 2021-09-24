@@ -9,11 +9,11 @@ gpu_ids: [0]
 
 #### datasets
 datasets:
-  train:
+  train: # 'train' is used as dataset['phase'] at option.py
     name: train
     mode: RCAN  # DRB / DRB_no_patch / LQGT / RCAN
-    dataroot_GT: D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
-    dataroot_LQ: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
+    dataroot_GT: ../../REDS/train_sharp #D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
+    dataroot_LQ: ../../REDS/train_sharp_bicubic/X4 #D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
     n_workers: 0  # per GPU
     batch_size: 16
@@ -22,12 +22,15 @@ datasets:
     use_rot: true
     color: RGB
     data_type: img
-  val:
+    #    scale: ~  # written at option.py
+  val: # 'val' is used as dataset['phase'] at option.py
     name: val
     mode: RCAN
-    dataroot_GT: D:/REDS/val_sharp # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
-    dataroot_LQ: D:/REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
+    dataroot_GT: ../../REDS/val_sharp # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
+    dataroot_LQ: ../../REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
     data_type: img
+    # phase: ~  # written at option.py
+    # scale: ~  # written at option.py
 
 #### network structures
 network_RCAN:
@@ -48,9 +51,15 @@ network_RCAN:
 
 #### path
 path:
-  pretrain_model: ../experiments/RCAN/models/120000_G.pth
+  pretrain_model: H:/Proposed/experiments/RCAN/models/130000_G.pth
   strict_load: true
-  resume_state: ../experiments/RCAN/training_state/120000.state
+  resume_state: H:/Proposed/experiments/RCAN/training_state/130000.state
+  root: H:/Proposed              # written at option.py
+  #  experiment_root:  ~  # written at option.py
+  #  test_root:  ~        # written at option.py
+  #  models: ~            # written at option.py
+  #  training_state: ~    # written at option.py
+  #  val_images:  ~       # written at option.py
 
 #### training settings: learning rate scheme, loss
 train:
@@ -61,7 +70,7 @@ train:
   beta2: 0.999
   epsilon: !!float 1e-8
 
-  total_epochs: !!float 1e8
+  total_epochs: 300
   gamma: 0.5  # 'learning rate decay factor for step decay'
 
   pixel_criterion: l1

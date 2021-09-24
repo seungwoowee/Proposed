@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4
+name: DRB_SR_GT_256_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-1_cri_fea_l1_1_TP150000_x4
 
 use_tb_logger: true
 model: DRB
@@ -11,15 +11,15 @@ gpu_ids: [0]
 datasets:
   train:
     name: train
-    mode: DRB_no_patch  # DRB
+    mode: DRB  # DRB / DRB_no_patch
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
     dataroot_GT: D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
     dataroot_LR: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 1
-    GT_size: 256
+    batch_size: 4
+    GT_size: 512
     use_flip: true
     use_rot: true
     color: RGB
@@ -54,9 +54,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/models/160000_G.pth
+  pretrain_model_DRB: ~ # ../experiments/name/models/160000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB_SR_block_n_3_lrDRB_1e-4_pixelShuffle_pix_cb_1e-2_cri_fea_l1_1e-1_TP150000_x4/training_state/160000.state
+  resume_state: ~ # ../experiments/name/training_state/160000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -98,11 +98,9 @@ train:
   lr_gamma: 0.5
 
   pixel_criterion: cb   # l1
-  pixel_weight: !!float 1e-2  # 1
-
+  pixel_weight: !!float 1e-1  # 1
   feature_criterion: l1
-  feature_weight: !!float 1e-1  # 1
-
+  feature_weight: 1   # !!float 1e-1
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 
