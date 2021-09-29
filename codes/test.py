@@ -14,8 +14,10 @@ from models import create_model
 def test():
     #### options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, default='options/test_RCAN.yml', help='Path to option YMAL file.')  # final
-    # parser.add_argument('-opt', type=str, default='options/test_EDSR.yml', help='Path to option YMAL file.')  # edited
+    # parser.add_argument('-opt', type=str, default='options/test_EDSR.yml', help='Path to option YMAL file.')
+    parser.add_argument('-opt', type=str, default='options/test_RCAN.yml', help='Path to option YMAL file.')
+    # parser.add_argument('-opt', type=str, default='options/test_DBPN.yml', help='Path to option YMAL file.')
+
     opt = option.parse(parser.parse_args().opt, is_train=False)
     opt = option.dict_to_nonedict(opt)
 
@@ -54,14 +56,10 @@ def test():
             model.feed_data(data, need_GT=need_GT)
             img_path = data['GT_path'][0] if need_GT else data['LQ_path'][0]
             img_name = osp.splitext(osp.basename(img_path))[0]
-            if opt['model'] == 'sr':
-                model.test_x8()
-            elif opt['large'] is not None:
-                model.test_chop()
-            else:
-                model.test()
-            if opt['back_projection'] is not None and opt['back_projection'] is True:
-                model.back_projection()
+            seq_img_name = img_path.split('\\')[-2]+'_'+img_name
+
+            model.test()
+
             visuals = model.get_current_visuals(need_GT=need_GT)
 
             sr_img = util.tensor2img(visuals['SR'])  # uint8
@@ -69,9 +67,9 @@ def test():
             # save images
             suffix = opt['suffix']
             if suffix:
-                save_img_path = osp.join(dataset_dir, img_path.split('\\')[-2]+'_'+img_name + suffix + '.png')
+                save_img_path = osp.join(dataset_dir, seq_img_name + suffix + '.png')
             else:
-                save_img_path = osp.join(dataset_dir, img_path.split('\\')[-2]+'_'+img_name + '.png')
+                save_img_path = osp.join(dataset_dir, seq_img_name + '.png')
             util.save_img(sr_img, save_img_path)
 
             # calculate PSNR and SSIM
@@ -108,11 +106,11 @@ def test():
                     test_results['ssim_y'].append(ssim_y)
                     logger.info(
                         '{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.'.
-                            format(img_name, psnr, ssim, psnr_y, ssim_y))
+                            format(seq_img_name, psnr, ssim, psnr_y, ssim_y))
                 else:
-                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}.'.format(img_name, psnr, ssim))
+                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}.'.format(seq_img_name, psnr, ssim))
             else:
-                logger.info(img_name)
+                logger.info(seq_img_name)
 
         test_run_time = time.time() - test_start_time
         print('Runtime {} (s) per image'.format(test_run_time / len(test_loader)))

@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_SR_GT_256_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1e-1_cri_fea_l1_1_TP150000_x4
+name: DRB_net
 
 use_tb_logger: true
 model: DRB
@@ -9,7 +9,7 @@ gpu_ids: [0]
 
 #### datasets
 datasets:
-  train:
+  train: # 'train' is used as dataset['phase'] at option.py
     name: train
     mode: DRB  # DRB / DRB_no_patch
     aug: ~ #noise
@@ -18,14 +18,15 @@ datasets:
     dataroot_LR: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 4
-    GT_size: 512
+    batch_size: 1
+    GT_size: 256
     use_flip: true
     use_rot: true
     color: RGB
     data_type: seq
     position: mid # side_1st // side 2nd // mid
     ref_frame_num: 5 # 3 / 5 / 7 ...
+    #    scale: ~  # written at option.py
   val:
     name: val
     mode: DRB
@@ -34,6 +35,8 @@ datasets:
     data_type: seq
     position: mid # side_1st // side 2nd // mid
     ref_frame_num: 5 # 3 / 5 / 7 ...
+    # phase: ~  # written at option.py
+    # scale: ~  # written at option.py
 
 #### network structures
 network_G:
@@ -49,7 +52,7 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB_mid # DRB_1st // DRB_2nd
+  which_model_DRB: DRB_no_unet # DRB_mid // DRB_no_unet
 
 #### path
 path:
@@ -57,6 +60,12 @@ path:
   pretrain_model_DRB: ~ # ../experiments/name/models/160000_G.pth
   strict_load: true
   resume_state: ~ # ../experiments/name/training_state/160000.state
+  root: H:/Proposed              # written at option.py
+  #  experiment_root:  ~  # written at option.py
+  #  test_root:  ~        # written at option.py
+  #  models: ~            # written at option.py
+  #  training_state: ~    # written at option.py
+  #  val_images:  ~       # written at option.py
 
 #### training settings: learning rate scheme, loss
 train:

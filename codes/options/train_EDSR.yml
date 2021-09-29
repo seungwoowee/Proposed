@@ -48,9 +48,9 @@ network_EDSR:
 
 #### path
 path:
-  pretrain_model: H:/Proposed/experiments/EDSR/models/60000_G.pth
+  pretrain_model: H:/Proposed/experiments/EDSR/models/320000_G.pth
   strict_load: true
-  resume_state: H:/Proposed/experiments/EDSR/training_state/60000.state
+  resume_state: H:/Proposed/experiments/EDSR/training_state/320000.state
   root: H:/Proposed              # written at option.py
   #  experiment_root:  ~  # written at option.py
   #  test_root:  ~        # written at option.py

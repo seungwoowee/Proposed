@@ -39,6 +39,8 @@ def create_dataset(dataset_opt):
         from data.LQGT_RCAN import LQGTDataset as D
     elif mode == 'EDSR':
         from data.LQGT_EDSR import LQGTDataset as D
+    elif mode == 'DBPN':
+        from data.LQGT_DBPN import LQGTDataset as D
     # elif mode == 'LQGTseg_bg':
     #     from data.LQGT_seg_bg_dataset import LQGTSeg_BG_Dataset as D
     else:

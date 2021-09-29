@@ -7,6 +7,7 @@ import models.modules.RRDBNet_arch as RRDBNet_arch
 import models.modules.DRBNet_arch as DRBNet_arch
 import models.modules.RCAN_arch as RCAN_arch
 import models.modules.EDSR_arch as EDSR_arch
+import models.modules.DBPN_arch as DBPN_arch
 
 logger = logging.getLogger('base')
 
@@ -69,10 +70,8 @@ def define_DRB(opt):
     which_model = opt_net['which_model_DRB']
     if which_model == 'DRB_mid':
         net = DRBNet_arch.DRBNet_mid()
-    elif which_model == 'DRB_side_1st':
-        net = DRBNet_arch.DRBNet_side_1st()
-    elif which_model == 'DRB_side_2nd':
-        net = DRBNet_arch.DRBNet_side_2nd()
+    elif which_model == 'DRB_no_unet':
+        net = DRBNet_arch.DRB_no_unet()
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net
@@ -102,4 +101,15 @@ def define_EDSR(opt):
                              res_scale=opt_net['res_scale'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('EDSR'))
+    return net
+
+
+def define_DBPN(opt):
+    opt_net = opt['network_DBPN']
+    which_model = opt_net['which_model']
+    if which_model == 'DBPN':
+        net = DBPN_arch.DBPN(num_channels=opt_net['num_channels'], base_filter=opt_net['base_filter'],
+                             feat=opt_net['n_feats'], num_stages=opt_net['num_stages'], scale_factor=opt_net['scale'])
+    else:
+        raise NotImplementedError('Discriminator model [{:s}] not recognized'.format('DBPN'))
     return net

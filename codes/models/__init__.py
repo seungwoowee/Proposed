@@ -10,6 +10,9 @@ def create_model(opt):
         from .RCAN_model import RCANModel as M
     elif model == 'EDSR':
         from .EDSR_model import EDSRModel as M
+    elif model == 'DBPN':
+        from .DBPN_model import DBPNModel as M
+
     elif model == 'sr':
         from .SR_model import SRModel as M
     elif model == 'srgan':

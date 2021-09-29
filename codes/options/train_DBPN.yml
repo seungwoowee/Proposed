@@ -1,8 +1,8 @@
 #### general settings
-name: RCAN
+name: DBPN
 
 use_tb_logger: true
-model: RCAN
+model: DBPN
 distortion: sr
 scale: 4
 gpu_ids: [0]
@@ -11,13 +11,13 @@ gpu_ids: [0]
 datasets:
   train: # 'train' is used as dataset['phase'] at option.py
     name: train
-    mode: RCAN  # DRB / DRB_no_patch / LQGT / RCAN
+    mode: DBPN
     dataroot_GT: ../../REDS/train_sharp #D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
     dataroot_LQ: ../../REDS/train_sharp_bicubic/X4 #D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 16
-    GT_size: 192
+    batch_size: 10
+    GT_size: 128
     use_flip: true
     use_rot: true
     color: RGB
@@ -25,35 +25,30 @@ datasets:
     #    scale: ~  # written at option.py
   val: # 'val' is used as dataset['phase'] at option.py
     name: val
-    mode: RCAN
+    mode: DBPN
     dataroot_GT: ../../REDS/val_sharp # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
     dataroot_LQ: ../../REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
     data_type: img
-    # phase: ~  # written at option.py
-    # scale: ~  # written at option.py
+    #    phase: ~  # written at option.py
+    #    scale: ~  # written at option.py
 
 #### network structures
-network_RCAN:
-  which_model: RCAN
-  n_resgroups: 10
-  n_resblocks: 20
-  n_feats: 64
-  reduction: 16
+network_DBPN:
+  which_model: DBPN
+  num_channels: 3
+  base_filter: 64
+  n_feats: 256
+  num_stages: 3
   scale: 4
-  rgb_range: 1  # 255
-  n_colors: 3
-  res_scale: 1
-  shift_mean: True
-  precision: single
-  gan_k: 1  # k value for adversarial loss
+  rgb_range: 255  # 255
 
 
 
 #### path
 path:
-  pretrain_model: H:/Proposed/experiments/RCAN/models/300000_G.pth
+  pretrain_model: H:/Proposed/experiments/DBPN/models/10000_G.pth
   strict_load: true
-  resume_state: H:/Proposed/experiments/RCAN/training_state/300000.state
+  resume_state: H:/Proposed/experiments/DBPN/training_state/10000.state
   root: H:/Proposed              # written at option.py
   #  experiment_root:  ~  # written at option.py
   #  test_root:  ~        # written at option.py
@@ -64,28 +59,23 @@ path:
 #### training settings: learning rate scheme, loss
 train:
   lr: !!float 1e-4
-  lr_decay: 200
-  weight_decay: 0
+  lr_decay: !!float 5e5
+  weight_decay: !!float 1e-4
   beta1: 0.9
   beta2: 0.999
   epsilon: !!float 1e-8
 
-  total_epochs: 300
-  gamma: 0.5  # 'learning rate decay factor for step decay'
+  niter: !!float 1e6
+  gamma: 0.1  # 'learning rate decay factor for step decay'
 
   pixel_criterion: l1
   pixel_weight: 1
 
-  skip_threshold: !!float 1e6 # skipping batch that has large error
-
-  D_update_ratio: 1
-  D_init_iters: 0
-
-  manual_seed: 1
+  manual_seed: 123
   val_freq: !!float 1e4
 
 #### logger
 ## tensorboard --logdir ./tb_logger --port=6006
 logger:
   print_freq: 100
-  save_checkpoint_freq: !!float 1e4
+  save_checkpoint_freq: !!float 5e3

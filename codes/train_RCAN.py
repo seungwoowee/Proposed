@@ -199,12 +199,12 @@ def main():
                     gt_img = util.tensor2img(visuals['GT'])  # uint8
 
                     # Save SR images for reference
-                    img_name = os.path.splitext(os.path.basename(val_data['LQ_path'][0]))[0]
-                    img_dir = opt['path']['val_images']
-                    util.mkdir(img_dir)
-                    save_img_path = os.path.join(img_dir, '{:s}_{:s}_{:d}.png'.format(
-                        val_data['LQ_path'][0].split('\\')[-2], img_name, current_step))
-                    util.save_img(sr_img, save_img_path)
+                    # img_name = os.path.splitext(os.path.basename(val_data['LQ_path'][0]))[0]
+                    # img_dir = opt['path']['val_images']
+                    # util.mkdir(img_dir)
+                    # save_img_path = os.path.join(img_dir, '{:s}_{:s}_{:d}.png'.format(
+                    #     val_data['LQ_path'][0].split('\\')[-2], img_name, current_step))
+                    # util.save_img(sr_img, save_img_path)
 
                     # calculate PSNR
                     crop_size = opt['scale']

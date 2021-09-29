@@ -33,7 +33,8 @@ network_EDSR:
 
 #### path
 path:
-  pretrain_model: ../pretrained_model/edsr_baseline_x4-6b446fab.pt
+  root: H:/Proposed              # written at option.py
+  pretrain_model: ../pretrained_model/EDSR_REDS_300epoch.pth
   strict_load: true
   results_root: ../results
 
