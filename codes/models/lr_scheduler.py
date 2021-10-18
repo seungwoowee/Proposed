@@ -69,9 +69,9 @@ if __name__ == "__main__":
     # MultiStepLR_Restart
     ##############################
     ## Original
-    lr_steps = [200000, 400000, 600000, 800000]
-    restarts = None
-    restart_weights = None
+    # lr_steps = [200000, 400000, 600000, 800000]
+    # restarts = None
+    # restart_weights = None
 
     ## two
     # lr_steps = [100000, 200000, 300000, 400000, 490000, 600000, 700000, 800000, 900000, 990000]
@@ -98,12 +98,12 @@ if __name__ == "__main__":
     # restart_weights = [1]
     #
     # ## four
-    # T_period = [250000, 250000, 250000, 250000]
-    # restarts = [250000, 500000, 750000]
-    # restart_weights = [1, 1, 1]
-    #
-    # scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
-    #                                       weights=restart_weights)
+    T_period = [250000, 250000, 250000, 250000]
+    restarts = [250000, 500000, 750000]
+    restart_weights = [1, 0.75, 0.5]
+
+    scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
+                                          weights=restart_weights)
 
     ##############################
     # Draw figure

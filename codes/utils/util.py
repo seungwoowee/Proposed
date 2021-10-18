@@ -20,6 +20,14 @@ except ImportError:
     from yaml import Loader, Dumper
 
 
+
+
+# from models.acceleration import *
+# for ShowImage Class
+from matplotlib import pyplot as plt
+from matplotlib.widgets import Slider
+
+
 def OrderedYaml():
     '''yaml orderedDict support'''
     _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
@@ -45,7 +53,7 @@ def initialize_weights(net_list, scale=1):
             if isinstance(m, nn.Conv2d):
                 # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
-                m.weight.data *= scale
+                m.weight.data *= scale  # for residual block
                 if m.bias is not None:
                     # nn.init.constant_(m.bias, 0)
                     m.bias.data.zero_()
@@ -261,3 +269,75 @@ class ProgressBar(object):
             sys.stdout.write('completed: {}, elapsed: {}s, {:.1f} tasks/s'.format(
                 self.completed, int(elapsed + 0.5), fps))
         sys.stdout.flush()
+
+class ShowImage:
+    def __init__(self):
+        self.f = plt.figure(figsize=(17, 7))                                     # figure axis setup
+        self.f.subplots_adjust(bottom=0.15)
+        self.data = []
+        self.im = []
+
+
+    def put_data(self, im, I, t=1):     # 칸plt  , 이미지
+        with torch.no_grad():
+            if type(I) is list and len(I)==3 and I[1] is not None: # 함수[0] + 2args[1][2]
+                if I[1].shape[1]==3:  im.set_data(  I[0](I[1],I[2]*t     )[0][0,:,:,:].permute([1,2,0]).cpu().numpy()  );return   # 3채널이미지일땐 그냥 plot되지만
+                if I[1].shape[1]==2:  im.set_data(  self.ycbcr2rgb(  I[0](I[1],I[2]*t     )[0][0,:,:,:]  )  )           ;return   # 2채널플로우일때 다시한번 3채널로만들어줘야함
+            if type(I) is list and len(I)==4 and I[1] is not None: # 함수[0] + 3args[1][2][3]     (함수의 아웃풋이 2개 튜플임)
+                if I[1].shape[1]==3:  im.set_data(  I[0](I[1],I[2]*t,I[3])[0][0,:,:,:].permute([1,2,0]).cpu().numpy()  );return   # 3채널이미지일땐 그냥 plot되지만
+                if I[1].shape[1]==2:  im.set_data(  self.ycbcr2rgb(  I[0](I[1],I[2]*t,I[3])[0][0,:,:,:]  )  )           ;return   # 2채널플로우일때 다시한번 3채널로만들어줘야함
+            if I is None:                        im.set_data(  np.full((128,128,3),0.1)  )                              ;return   # None
+            if type(I[0]) is not torch.Tensor:   im.set_data(  np.full((128,128,3),0.3)  )                              ;return
+            if I[0].shape[0] == 2: im.set_data(  self.ycbcr2rgb( I )  )                                                 ;return   # flow 맵
+            if I[0].shape[0] == 3: im.set_data(  I[:, [2, 1, 0], :, :][0].permute([1,2,0]).cpu().numpy() )                            ;return   # 3cb rgb타입
+            if I[0].shape[0] == 1: im.set_data(  I[0,:,:,:].repeat(3,1,1).permute([1,2,0]).cpu().numpy())               ;return  # mask
+
+            im.set_data(np.full((256, 256, 3), 0.22))      # 모두 해당안할시
+
+    def append(self, *args):    # ShowImage 디버그는 배치사이즈 1일때만 동작한다는걸 명심
+        with torch.no_grad():
+            for I in args:
+                self.data.append(I)
+
+    def update_depth(self, page):   # update the figure with a change on the slider
+        with torch.no_grad():
+            if self.slider_depth.val != round(self.slider_depth.val): self.slider_depth.set_val(float(round(self.slider_depth.val))) ; plt.pause(0.4)  # 정수로 고정
+            idx = int(self.slider_depth.val)
+            t = (self.slider_deptht.val)
+            for nn in range(len(self.im)):      # 8개 화면에 대한 for
+                if len(self.data) > idx*len(self.im)+nn:   self.put_data( self.im[nn], self.data[idx*len(self.im)+nn], t)
+                else: self.put_data( self.im[nn], None)         # 아웃오브 인덱스는 None 이미지
+
+    def show(self, n=1):
+        with torch.no_grad():
+            r = 1; c = n;
+            if n > 4: r=n//4; c=4;
+            self.slider = plt.axes([0.44, 0.005, 0.09, 0.02])            # setup a slider axis and the Slider
+            self.slidert = plt.axes([0.24, 0.005, 0.09, 0.02])
+            self.slider_depth = Slider(self.slider, 'cnt:', 0, (math.ceil(len(self.data)/n))-1, valinit=0)
+            self.slider_deptht = Slider(self.slidert, 't:', 0, 1, valinit=1)
+            self.slider_depth.on_changed(self.update_depth)
+            self.slider_deptht.on_changed(self.update_depth)
+            for nn in range(0, n): self.im.append( self.f.add_subplot(r, c, nn+1).imshow( np.full((128,128,3),0.7), interpolation='nearest') )
+            self.update_depth(0)
+            plt.tight_layout()
+            plt.show()
+
+    def ycbcr2rgb(self, I):
+        rgb = torch.cat(  (torch.Tensor(I[0,:,:,:].squeeze()[1:,:,:].shape).fill_(0.72).cuda(),  I[0,:,:,:].squeeze())  ,0).permute([1,2,0]).cpu().numpy()
+        xform = np.array([[1, 0, 1.402], [1, -0.34414, -.71414], [1, 1.772, 0]])
+        rgb[:, :, [1, 2]] /= 32        # uv 범위는 +- 128이니까 128*8 범위만큼커버
+        return rgb.dot(xform.T)
+
+    def ycbcr2rgbt(self, I):
+        I = torch.cat((torch.Tensor(I[:, 1:, :].shape).fill_(0.99).cuda(), I[:, :, :, :]), 1)
+        y: torch.Tensor =  I[..., 0, :, :]
+        cb: torch.Tensor = I[..., 1, :, :]
+        cr: torch.Tensor = I[..., 2, :, :]
+        delta: float = 0.5
+        cb_shifted: torch.Tensor = cb - delta
+        cr_shifted: torch.Tensor = cr - delta
+        r: torch.Tensor = y + 1.403 * cr_shifted
+        g: torch.Tensor = y - 0.714 * cr_shifted - 0.344 * cb_shifted
+        b: torch.Tensor = y + 1.773 * cb_shifted
+        return torch.stack([r, g, b], -3)

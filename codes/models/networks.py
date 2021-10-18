@@ -71,7 +71,7 @@ def define_DRB(opt):
     if which_model == 'DRB_mid':
         net = DRBNet_arch.DRBNet_mid()
     elif which_model == 'DRB_no_unet':
-        net = DRBNet_arch.DRB_no_unet()
+        net = DRBNet_arch.DRB_no_unet(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net

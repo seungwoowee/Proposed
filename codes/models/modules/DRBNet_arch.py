@@ -5,21 +5,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-import os
-from utils import util
-from data.util import read_img
+from utils import util  # 디버그용
 
 from models.modules.GMA_core.GMA_network import RAFTGMA
 from models.modules.GMA_core.GMA_utils.utils import InputPadder
 
 import numpy as np
 from PIL import Image
-import cv2
 
 import torchvision.transforms as transforms
-
-import functools
-import models.modules.module_util as mutil
+from models.modules import module_util
 
 
 def load_image(path):
@@ -42,23 +37,31 @@ def show_PIL_image(imgs):
     return dst
 
 
-def flow_cal(ref_img, src_img, model):
-    padder = InputPadder(ref_img.shape)
-    ref_img, src_img = padder.pad(ref_img, src_img)
-    _, flow = model(ref_img, src_img, iters=12, test_mode=True)
+def flow_cal(src_img, ref_img, model):
+    padder = InputPadder(src_img.shape)
+    src_img_pad, ref_img_pad = padder.pad(src_img, ref_img)
+    _, flow = model(src_img_pad, ref_img_pad, iters=12, test_mode=True)
     return padder.unpad(flow)
 
 
-def flow_cal_backwarp(ref_img, src_img, model):
-    padder = InputPadder(ref_img.shape)
-    ref_img, src_img = padder.pad(ref_img, src_img)
-    _, flow = model(ref_img, src_img, iters=12, test_mode=True)
-    out = backwarp(padder.unpad(src_img), padder.unpad(flow))
+def flow_cal_backwarp(src_img, ref_img, model):
+    padder = InputPadder(src_img.shape)
+    src_img_pad, ref_img_pad = padder.pad(src_img, ref_img)
+    _, flow = model(src_img_pad, ref_img_pad, iters=12, test_mode=True)
+    out = backwarp(padder.unpad(ref_img_pad), padder.unpad(flow), src_img)
     return out
 
 
-def backwarp(img, flow):
-    _, _, H, W = img.size()
+def flow_cal_backwarp2(src_img, ref_img, model):
+    padder = InputPadder(src_img.shape)
+    src_img_pad, ref_img_pad = padder.pad(src_img, ref_img)
+    _, flow = model(src_img_pad, ref_img_pad, iters=12, test_mode=True)
+    out = backwarp(padder.unpad(src_img_pad), padder.unpad(flow), src_img)
+    return out
+
+
+def backwarp(ref_img, flow, src_img):
+    _, _, H, W = ref_img.size()
 
     u = flow[:, 0, :, :]
     v = flow[:, 1, :, :]
@@ -72,10 +75,16 @@ def backwarp(img, flow):
     # range -1 to 1
     x = 2 * (x / W - 0.5)
     y = 2 * (y / H - 0.5)
+
+    # x = 2 * ((x - x.min()) / (x.max() - x.min()) - 0.5)
+    # y = 2 * ((y - y.min()) / (y.max() - y.min()) - 0.5)
     # stacking X and Y
     grid = torch.stack((x, y), dim=3)
     # Sample pixels using bilinear interpolation.
-    imgOut = torch.nn.functional.grid_sample(img, grid, align_corners=True)  # I2 , F12
+    imgOut = torch.nn.functional.grid_sample(ref_img, grid)  # I2 , F12
+    # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
+    a = imgOut == 0
+    imgOut = imgOut + src_img.mul(a)
     return imgOut
 
 
@@ -95,133 +104,9 @@ flow_parser.add_argument('--mixed_precision', action='store_true', help='use mix
 flow_args = flow_parser.parse_args()
 
 
-class PixelShufflePack(nn.Module):
-    """ Pixel Shuffle upsample layer.
-
-    Args:
-        in_channels (int): Number of input channels.
-        out_channels (int): Number of output channels.
-        kernel_size (int): Kernel size of Conv layer to expand channels.
-
-    Returns:
-        Upsampled feature map.
-    """
-
-    def __init__(self, in_channels, out_channels):
-        super(PixelShufflePack, self).__init__()
-        self.upsample_conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels * 4,
-                                       kernel_size=3, padding=1)
-        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-
-        util.initialize_weights([self.upsample_conv])
-
-    def forward(self, x):
-        """Forward function for PixelShufflePack.
-
-        Args:
-            x (Tensor): Input tensor with shape (n, c, h, w).
-
-        Returns:
-            Tensor: Forward results.
-        """
-        x = self.upsample_conv(x)
-        x = F.pixel_shuffle(x, 2)
-        x = self.lrelu(x)
-
-        return x
-
-
-class CALayer(nn.Module):
-    def __init__(self, inout_ch, ch_reduction_ratio):
-        super(CALayer, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv_du = nn.Sequential(
-            nn.Conv2d(inout_ch, inout_ch // ch_reduction_ratio, 1, padding=0, bias=True),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(inout_ch // ch_reduction_ratio, inout_ch, 1, padding=0, bias=True),
-            nn.Sigmoid()
-        )
-
-        util.initialize_weights([self.conv_du])
-
-    def forward(self, x):
-        y = self.avg_pool(x)
-        y = self.conv_du(y)
-        return x * y
-
-
-class DRBModule_with_CA(nn.Module):
-    def __init__(self, in_ch, out_ch, ch_reduction_ratio, bias=False, res_scale=1):
-        super(DRBModule_with_CA, self).__init__()
-
-        self.conv1 = nn.Conv2d(in_channels=in_ch, out_channels=in_ch, kernel_size=3, stride=1, padding=1, bias=bias)
-        self.conv2 = nn.Conv2d(in_channels=in_ch + in_ch, out_channels=in_ch, kernel_size=3, stride=1, padding=1,
-                               bias=bias)
-        self.conv3 = nn.Conv2d(in_channels=in_ch + in_ch, out_channels=in_ch, kernel_size=3, stride=1, padding=1,
-                               bias=bias)
-        self.conv4 = nn.Conv2d(in_channels=in_ch + in_ch, out_channels=in_ch, kernel_size=3, stride=1, padding=1,
-                               bias=bias)
-        self.conv5 = nn.Conv2d(in_channels=in_ch + in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1,
-                               bias=bias)
-        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-
-        self.CA1 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
-        self.CA2 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
-        self.CA3 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
-        self.CA4 = CALayer(inout_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio)
-        self.CA5 = CALayer(inout_ch=out_ch, ch_reduction_ratio=ch_reduction_ratio)
-
-        self.res_scale = res_scale
-
-        util.initialize_weights([self.conv1, self.conv2, self.conv3, self.conv4, self.conv5])
-
-    def forward(self, x):
-        x1 = self.CA1(self.lrelu(self.conv1(x)))
-        x2 = self.CA2(self.lrelu(self.conv2(torch.cat((x, x1), 1))))
-        x3 = self.CA3(self.lrelu(self.conv3(torch.cat((x1, x2), 1))))
-        x4 = self.CA4(self.lrelu(self.conv4(torch.cat((x2, x3), 1))))
-        x5 = self.CA5(self.conv5(torch.cat((x3, x4), 1)))
-
-        return x5 * self.res_scale + x
-
-
-class DRBNet(nn.Module):
-    def __init__(self, in_ch, out_ch, ch_reduction_ratio, bias, res_scale):
-        super(DRBNet, self).__init__()
-        self.DRB = DRBModule_with_CA(in_ch=in_ch, out_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio, bias=bias,
-                                     res_scale=res_scale)
-        self.conv_out = nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1,
-                                  bias=False)
-        self.res_scale = res_scale
-
-        util.initialize_weights([self.conv_out])
-
-    def forward(self, x):
-        out = self.DRB(x)
-        out = self.conv_out(out)
-
-        return out
-
-
-class img_to_feat(nn.Module):
-    def __init__(self, in_ch, out_ch, use_bias):
-        super(img_to_feat, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, bias=use_bias),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(in_channels=out_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, bias=use_bias)
-        )
-
-        util.initialize_weights([self.features])
-
-    def forward(self, x):
-        out = self.features(x)
-        return out
-
-
 ### final model
 class DRB_no_unet(nn.Module):
-    def __init__(self):
+    def __init__(self, rgb_range, scale):
         super(DRB_no_unet, self).__init__()
 
         ### optical flow: GMA   ###################################
@@ -232,123 +117,190 @@ class DRB_no_unet(nn.Module):
         self.GMA_model.eval()
         ###########################################################
 
-        use_act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        # RGB mean for DIV2K
+        rgb_mean = (0.4488, 0.4371, 0.4040)
+        rgb_std = (1.0, 1.0, 1.0)
+        self.sub_mean = module_util.MeanShift(rgb_range, rgb_mean, rgb_std)
+        self.add_mean = module_util.MeanShift(rgb_range, rgb_mean, rgb_std, 1)
+
         use_bias = True
-        use_bn = False
+        use_act = 'prelu'  # 'relu' 'prelu'  'lrelu' 'tanh' 'sigmoid'
+        use_norm = None  # batch / instance
 
-        res_scale = 1
-        in_ch = 64
+        feat = 256
+        unit_feat = 64
+
+        self.feat0_0 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat0_1 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat0_2 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat0_3 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat0_4 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+
+        self.feat1_0 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat1_1 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat1_2 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat1_3 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat1_4 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
+                                              bias=use_bias, activation=use_act, norm=use_norm)
+
         ch_reduction_ratio = 16
-        block_n = 1
-
-        self.in_feat0 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat1 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat2 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat3 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
-        self.in_feat4 = img_to_feat(in_ch=3, out_ch=in_ch, use_bias=use_bias)
+        block_n = 6
 
         module_DRB = [
-            DRBNet(in_ch=in_ch, out_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio, bias=use_bias,
-                   res_scale=res_scale)
-            for _ in range(block_n)]
+            module_util.DRBModule(inout_ch=unit_feat, ch_reduction_ratio=ch_reduction_ratio, bias=use_bias, act=use_act,
+                                  block_n=k + 1)
+            for k in range(block_n)]
 
-        self.DRB_00 = nn.Sequential(*module_DRB)
-        self.DRB_10 = nn.Sequential(*module_DRB)
+        self.dense_DRB = nn.Sequential(*module_DRB)
 
-        module_DRB = [
-            DRBNet(in_ch=2 * in_ch, out_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio, bias=use_bias,
-                   res_scale=res_scale)
-            for _ in range(block_n)]
-
-        self.DRB_01 = nn.Sequential(*module_DRB)
-        self.DRB_02 = nn.Sequential(*module_DRB)
-        self.DRB_03 = nn.Sequential(*module_DRB)
-        self.DRB_04 = nn.Sequential(*module_DRB)
-
-        self.DRB_11 = nn.Sequential(*module_DRB)
-        self.DRB_12 = nn.Sequential(*module_DRB)
-        self.DRB_13 = nn.Sequential(*module_DRB)
-        self.DRB_14 = nn.Sequential(*module_DRB)
-
-        module_DRB = [
-            DRBNet(in_ch=3 * in_ch, out_ch=in_ch, ch_reduction_ratio=ch_reduction_ratio, bias=use_bias,
-                   res_scale=res_scale)
-            for _ in range(block_n)]
-
-        self.DRB_final = nn.Sequential(*module_DRB)
-
-        self.upsample1 = PixelShufflePack(in_channels=in_ch, out_channels=in_ch)
-        self.upsample2 = PixelShufflePack(in_channels=in_ch, out_channels=in_ch)
-
-        self.HRconv = nn.Conv2d(in_channels=in_ch, out_channels=in_ch, kernel_size=3, stride=1, padding=1,
+        self.HRconv = nn.Conv2d(in_channels=unit_feat + block_n * unit_feat, out_channels=unit_feat, kernel_size=3,
+                                stride=1, padding=1,
                                 bias=use_bias)
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-        self.conv_out = nn.Conv2d(in_channels=in_ch, out_channels=3, kernel_size=3, stride=1, padding=1,
+        self.conv_out = nn.Conv2d(in_channels=unit_feat, out_channels=scale ** 2 * 3, kernel_size=3, stride=1,
+                                  padding=1,
                                   bias=use_bias)
-        self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)
+
+        self.upsample = module_util.PixelShufflePack(in_channels=scale ** 2 * 3, scale=scale)
+
+        self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bicubic', align_corners=False)
 
     def forward(self, x):
         # src_img = x[2]
         #
         # ref_img = x[0]
-        # flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        # x0 = torch.cat((ref_img, flow_, x[2]), 1)
+        # x0_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
+        # x0_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
         #
         # ref_img = x[1]
-        # flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        # x1 = torch.cat((ref_img, flow_, x[2]), 1)
+        # x1_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
+        # x1_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
         #
         # ref_img = x[3]
-        # flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        # x3 = torch.cat((ref_img, flow_, x[2]), 1)
+        # x3_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
+        # x3_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
         #
         # ref_img = x[4]
-        # flow_ = flow_cal(ref_img, src_img, self.GMA_model)
-        # x4 = torch.cat((ref_img, flow_, x[2]), 1)
+        # x4_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
+        # x4_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
+        # test = util.ShowImage()
+        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
+        # test.append(x[0], x[1], x[3], x[4])
+        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
+        # test.show(12)  # 한번에 보일 이미지 개수
+        #
+        # ref_img = x[0]
+        # x0_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
+        # x0_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[1]
+        # x1_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
+        # x1_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[3]
+        # x3_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
+        # x3_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[4]
+        # x4_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
+        # x4_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        # test = util.ShowImage()
+        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
+        # test.append(x[0], x[1], x[3], x[4])
+        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
+        # test.show(12)  # 한번에 보일 이미지 개수
+        #
+        # x0_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
+        # x0_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[1]
+        # x1_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
+        # x1_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[3]
+        # x3_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
+        # x3_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[4]
+        # x4_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
+        # x4_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
+        # test = util.ShowImage()
+        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
+        # test.append(x[0], x[1], x[3], x[4])
+        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
+        # test.show(12)  # 한번에 보일 이미지 개수
+        #
+        # ref_img = x[0]
+        # x0_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
+        # x0_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[1]
+        # x1_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
+        # x1_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[3]
+        # x3_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
+        # x3_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        #
+        # ref_img = x[4]
+        # x4_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
+        # x4_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
+        # test = util.ShowImage()
+        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
+        # test.append(x[0], x[1], x[3], x[4])
+        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
+        # test.show(12)  # 한번에 보일 이미지 개수
 
         src_img = x[2]
+        x[0] = flow_cal_backwarp(src_img, x[0], self.GMA_model)
+        x[1] = flow_cal_backwarp(src_img, x[1], self.GMA_model)
+        x[3] = flow_cal_backwarp(src_img, x[3], self.GMA_model)
+        x[4] = flow_cal_backwarp(src_img, x[4], self.GMA_model)
 
-        ref_img = x[0]
-        x0 = flow_cal_backwarp(src_img, ref_img, self.GMA_model)
+        x[0] = self.sub_mean(x[0])
+        x[1] = self.sub_mean(x[1])
+        x[2] = self.sub_mean(x[2])
+        x[3] = self.sub_mean(x[3])
+        x[4] = self.sub_mean(x[4])
 
-        ref_img = x[1]
-        x1 = flow_cal_backwarp(src_img, ref_img, self.GMA_model)
+        x[0] = self.feat1_0(self.feat0_0(x[0]))
+        x[1] = self.feat1_1(self.feat0_1(x[1]))
+        x[2] = self.feat1_2(self.feat0_2(x[2]))
+        x[3] = self.feat1_3(self.feat0_3(x[3]))
+        x[4] = self.feat1_4(self.feat0_4(x[4]))
 
-        ref_img = x[3]
-        x3 = flow_cal_backwarp(src_img, ref_img, self.GMA_model)
 
-        ref_img = x[4]
-        x4 = flow_cal_backwarp(src_img, ref_img, self.GMA_model)
+        # x = self.feat0(torch.cat((x[0], x[1], x[2], x[3], x[4]), 1))
+        # x = self.feat1(x)
+        # x_split = []
+        # for t in range(x.size(0)):
+        #     tmp = torch.split(x[t], 64)
+        #     tmp = torch.stack(tmp)
+        #     for k in range(len(tmp)):
+        #         x_split.append(tmp[k].unsqueeze(0))
 
-        x0 = self.in_feat0(x0)
-        x1 = self.in_feat1(x1)
-        x2 = self.in_feat2(x[2])
-        x3 = self.in_feat3(x3)
-        x4 = self.in_feat4(x4)
+        out = self.dense_DRB(x)
 
         ## show image
         # show_PIL_image(x[0][:, [2, 1, 0], :, :]).show()
 
-        out_0 = self.DRB_00(x2)
-        out_1 = self.DRB_10(x2)
+        out = self.conv_out(self.lrelu(self.HRconv(out[2])))
 
-        out_0 = self.DRB_01(torch.cat((x1, out_0), 1))
-        out_1 = self.DRB_11(torch.cat((x3, out_1), 1))
+        out = self.upsample(out)  # conv shuffle lrelu
 
-        out_0 = self.DRB_02(torch.cat((x0, out_0), 1))
-        out_1 = self.DRB_12(torch.cat((x4, out_1), 1))
+        out = self.add_mean(out)
 
-        out_0 = self.DRB_03(torch.cat((x0, out_0), 1))
-        out_1 = self.DRB_13(torch.cat((x4, out_1), 1))
-
-        out_0 = self.DRB_04(torch.cat((x1, out_0), 1))
-        out_1 = self.DRB_14(torch.cat((x3, out_1), 1))
-        out = self.DRB_final(torch.cat((out_0, out_1, x2), 1))
-
-        out = self.upsample1(out)  # conv shuffle lrelu
-        out = self.upsample2(out)  # conv shuffle lrelu
-
-        out = self.conv_out(self.lrelu(self.HRconv(out)))
         src_img = self.img_upsample_x4(src_img)
+
         out += src_img
+
         return out

@@ -46,9 +46,9 @@ network_DBPN:
 
 #### path
 path:
-  pretrain_model: H:/Proposed/experiments/DBPN/models/10000_G.pth
+  pretrain_model: H:/Proposed/experiments/DBPN/models/30000_G.pth
   strict_load: true
-  resume_state: H:/Proposed/experiments/DBPN/training_state/10000.state
+  resume_state: H:/Proposed/experiments/DBPN/training_state/30000.state
   root: H:/Proposed              # written at option.py
   #  experiment_root:  ~  # written at option.py
   #  test_root:  ~        # written at option.py
@@ -72,10 +72,10 @@ train:
   pixel_weight: 1
 
   manual_seed: 123
-  val_freq: !!float 1e4
+  val_freq: !!float 5e4
 
 #### logger
 ## tensorboard --logdir ./tb_logger --port=6006
 logger:
-  print_freq: 100
-  save_checkpoint_freq: !!float 5e3
+  print_freq: 1000
+  save_checkpoint_freq: !!float 1e4

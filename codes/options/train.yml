@@ -1,5 +1,5 @@
 #### general settings
-name: DRB_net
+name: DRB_GT_512_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x4
 
 use_tb_logger: true
 model: DRB
@@ -17,9 +17,9 @@ datasets:
     dataroot_GT: D:/REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
     dataroot_LR: D:/REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
-    n_workers: 0  # per GPU
+    n_workers: 4  # per GPU
     batch_size: 1
-    GT_size: 256
+    GT_size: 512
     use_flip: true
     use_rot: true
     color: RGB
@@ -53,6 +53,8 @@ network_D:
 
 network_DRB:
   which_model_DRB: DRB_no_unet # DRB_mid // DRB_no_unet
+  rgb_range: 1
+
 
 #### path
 path:
@@ -84,7 +86,7 @@ train:
   beta1_DRB: 0.9
   beta2_DRB: 0.999
 
-  niter: 600001
+  niter: 1200001
   warmup_iter: -1  # no warm up
 
 #  # MultiStepLR_Restart
@@ -93,23 +95,20 @@ train:
 #  restarts: [250000, 500000, 750000]
 #  restart_weights: [1, 1, 1]
 
-#  # CosineAnnealingLR_Restart
+  #  # CosineAnnealingLR_Restart
   lr_scheme: CosineAnnealingLR_Restart
   # four
-  T_period: [150000, 150000, 150000, 150000]
-  restarts: [150000, 300000, 450000]
-  restart_weights: [1, 1, 1]
-#  T_period: [ 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000 ]
-#  restarts: [ 30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000 ]
-#  restart_weights: [ 1, 1, 1, 1, 1, 1, 1, 1, 1 ]
+  T_period: [300000, 300000, 300000, 300000]
+  restarts: [300000, 600000, 900000]
+  restart_weights: [0.99, 0.989, 0.988]
   eta_min: 0
 
   lr_gamma: 0.5
 
-  pixel_criterion: cb   # l1
-  pixel_weight: !!float 1e-1  # 1
-  feature_criterion: l1
-  feature_weight: 1   # !!float 1e-1
+  pixel_criterion: cb   # l1 / cb
+  pixel_weight: !!float 1e-3 # !!float 1e-2
+  feature_criterion: cb # l1 / cb
+  feature_weight: !!float 1e-8
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 
@@ -117,7 +116,7 @@ train:
   D_init_iters: 0
 
   manual_seed: 10
-  val_freq: !!float 5e3
+  val_freq: !!float 1e4
 
 #### logger
 ## tensorboard --logdir ./tb_logger --port=6006

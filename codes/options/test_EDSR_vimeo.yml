@@ -1,0 +1,42 @@
+#### general settings
+name: EDSR
+
+model: EDSR
+distortion: ~
+scale: 4
+gpu_ids: [ 0 ]
+
+datasets:
+  val_test:
+    scale: 4
+    name: EDSR
+    mode: vimeo
+    data_type: img
+    dataroot_GT: D:/vimeo_septuplet/sequences # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
+    dataroot_LQ: D:/vimeo_septuplet/sequences_bicubic # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
+    file_list: D:/vimeo_septuplet/sep_testlist.txt
+#    dataroot_GT: D:\DIV2K\DIV2K_train_HR
+#    dataroot_LQ: D:\DIV2K\DIV2K_train_LR_bicubic\X4
+
+
+#### network structures
+network_EDSR:
+  which_model: EDSR
+  n_resblocks: 16
+  n_feats: 64
+  scale: 4
+  rgb_range: 255
+  n_colors: 3
+  res_scale: 1
+  shift_mean: True
+  precision: single
+  gan_k: 1  # k value for adversarial loss
+
+#### path
+path:
+  root: H:/Proposed              # written at option.py
+  pretrain_model: ../pretrained_model/EDSR_REDS_300epoch.pth
+  strict_load: true
+  results_root: ../results
+
+

@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 
+from utils import util
+
 
 def initialize_weights(net_l, scale=1):
     if not isinstance(net_l, list):
@@ -155,7 +157,6 @@ class Upsampler(nn.Sequential):
             raise NotImplementedError
 
         super(Upsampler, self).__init__(*m)
-
 
 
 ## STARnet module baseed
@@ -681,3 +682,177 @@ class PyramidModule(nn.Module):
 
         return final
 
+
+### DRB_Net module
+
+
+class PixelShufflePack(nn.Module):
+    """ Pixel Shuffle upsample layer.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel_size (int): Kernel size of Conv layer to expand channels.
+
+    Returns:
+        Upsampled feature map.
+    """
+
+    def __init__(self, in_channels, scale):
+        super(PixelShufflePack, self).__init__()
+        self.upsample_conv = nn.Conv2d(in_channels=in_channels, out_channels=in_channels,
+                                       kernel_size=3, padding=1)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        self.scale = scale
+
+        util.initialize_weights([self.upsample_conv])
+
+    def forward(self, x):
+        """Forward function for PixelShufflePack.
+
+        Args:
+            x (Tensor): Input tensor with shape (n, c, h, w).
+
+        Returns:
+            Tensor: Forward results.
+        """
+        x = self.upsample_conv(x)
+        x = F.pixel_shuffle(x, self.scale)
+        x = self.lrelu(x)
+
+        return x
+
+
+class CALayer(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio):
+        super(CALayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv_du = nn.Sequential(
+            nn.Conv2d(inout_ch, inout_ch // ch_reduction_ratio, 1, padding=0, bias=True),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(inout_ch // ch_reduction_ratio, inout_ch, 1, padding=0, bias=True),
+            nn.Sigmoid()
+        )
+
+        util.initialize_weights([self.conv_du])
+
+    def forward(self, x):
+        y = self.avg_pool(x)
+        y = self.conv_du(y)
+        return x * y
+
+
+class ConvModule(nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=True, activation='prelu',
+                 norm=None):
+        super(ConvModule, self).__init__()
+        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size, stride, padding, bias=bias)
+
+        self.norm = norm
+        if self.norm == 'batch':
+            self.bn = nn.BatchNorm2d(out_ch)
+        elif self.norm == 'instance':
+            self.bn = nn.InstanceNorm2d(out_ch)
+
+        self.activation = activation
+        if self.activation == 'relu':
+            self.act = nn.ReLU(True)
+        elif self.activation == 'prelu':
+            self.act = nn.PReLU()
+        elif self.activation == 'lrelu':
+            self.act = nn.LeakyReLU(0.2, True)
+        elif self.activation == 'tanh':
+            self.act = nn.Tanh()
+        elif self.activation == 'sigmoid':
+            self.act = nn.Sigmoid()
+
+        util.initialize_weights([self.conv])
+
+    def forward(self, x):
+        if self.norm is not None:
+            out = self.bn(self.conv(x))
+        else:
+            out = self.conv(x)
+
+        if self.activation is not None:
+            return self.act(out)
+        else:
+            return out
+
+
+class DRB_Block(torch.nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False, activation='prelu',
+                 use_norm=None):
+        super(DRB_Block, self).__init__()
+        self.conv1 = ConvModule(in_ch=in_ch, out_ch=out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+        self.conv2 = ConvModule(in_ch=out_ch, out_ch=out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+        self.conv3 = ConvModule(in_ch=out_ch, out_ch=out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+        self.conv4 = ConvModule(in_ch=out_ch, out_ch=out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+
+    def forward(self, x):
+        out1 = self.conv1(x)
+        res = self.conv2(out1)
+        out2 = self.conv3(res)
+        out = self.conv4(out2 - out1)
+        return out + res
+
+
+class DRBModule(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule, self).__init__()
+        self.conv1_0 = DRB_Block(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                 bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                 padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                 padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                 padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                 bias=bias, activation=act, use_norm=None)
+
+        self.conv2_1 = DRB_Block(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                 activation=act, use_norm=None)
+        self.conv2_2 = DRB_Block(in_ch=5 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                 activation=act, use_norm=None)
+        self.conv2_3 = DRB_Block(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                 activation=act, use_norm=None)
+
+        self.conv3_2 = DRB_Block(in_ch=3 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                 activation=act, use_norm=None)
+
+        self.CA = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+        self.conv_out = nn.Conv2d(in_channels=inout_ch + inout_ch * block_n, out_channels=inout_ch, kernel_size=3,
+                                  stride=1, padding=1, bias=False)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        x2_1 = self.conv2_1(torch.cat((x1_0, x1_1), 1))
+        x2_3 = self.conv2_3(torch.cat((x1_4, x1_3), 1))
+        x2_2 = self.conv2_2(torch.cat((x1_1, x1_2, x1_3, x2_1, x2_3), 1))
+
+        x3_2 = self.conv3_2(torch.cat((x2_1, x2_2, x2_3), 1))
+
+        out_0 = self.CA(self.conv_out(torch.cat((x[0], x1_0), 1)))
+        out_1 = self.CA(self.conv_out(torch.cat((x[1], x2_1), 1)))
+        out_2 = self.CA(self.conv_out(torch.cat((x[2], x3_2), 1)))
+        out_3 = self.CA(self.conv_out(torch.cat((x[3], x2_3), 1)))
+        out_4 = self.CA(self.conv_out(torch.cat((x[4], x1_4), 1)))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        return x
