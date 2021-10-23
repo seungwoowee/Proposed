@@ -63,7 +63,7 @@ class CosineAnnealingLR_Restart(_LRScheduler):
 
 
 if __name__ == "__main__":
-    optimizer = torch.optim.Adam([torch.zeros(3, 64, 3, 3)], lr=2e-4, weight_decay=0,
+    optimizer = torch.optim.Adam([torch.zeros(3, 64, 3, 3)], lr=1e-4, weight_decay=0,
                                  betas=(0.9, 0.99))
     ##############################
     # MultiStepLR_Restart
@@ -98,9 +98,12 @@ if __name__ == "__main__":
     # restart_weights = [1]
     #
     # ## four
-    T_period = [250000, 250000, 250000, 250000]
-    restarts = [250000, 500000, 750000]
-    restart_weights = [1, 0.75, 0.5]
+    T_period= [30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000,
+               30000]
+    restarts= [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000, 390000,
+               420000, 450000]
+    restart_weights= [0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107,
+                      0.2796, 0.2516, 0.2265]
 
     scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
                                           weights=restart_weights)
@@ -108,7 +111,7 @@ if __name__ == "__main__":
     ##############################
     # Draw figure
     ##############################
-    N_iter = 1000000
+    N_iter = 450000
     lr_l = list(range(N_iter))
     for i in range(N_iter):
         scheduler.step()

@@ -1,6 +1,5 @@
 #### general settings
-name: test
-
+name: DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP30000
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -18,7 +17,7 @@ datasets:
     use_shuffle: true
     n_workers: 4  # per GPU
     batch_size: 1
-    GT_size: 512
+    GT_size: 720
     use_flip: true
     use_rot: true
     color: RGB
@@ -51,16 +50,16 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB_no_unet # DRB_mid // DRB_no_unet
+  which_model_DRB: DRB
   rgb_range: 1
 
 
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ # ../experiments/name/models/160000_G.pth
+  pretrain_model_DRB: H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP30000/models/860000_G.pth
   strict_load: true
-  resume_state: ~ # ../experiments/name/training_state/160000.state
+  resume_state: H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP30000/training_state/865000.state
   root: H:/Proposed              # written at option.py
   #  experiment_root:  ~  # written at option.py
   #  test_root:  ~        # written at option.py
@@ -88,6 +87,10 @@ train:
   niter: 1200001
   warmup_iter: -1  # no warm up
 
+#  # MultiStepLR
+#  lr_scheme: MultiStepLR
+#  lr_steps: [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000]
+
 #  # MultiStepLR_Restart
 #  lr_scheme: MultiStepLR_Restart
 #  lr_steps: [50000, 100000, 200000, 300000]
@@ -97,20 +100,20 @@ train:
   #  # CosineAnnealingLR_Restart
   lr_scheme: CosineAnnealingLR_Restart
   # four
-  T_period: [300000, 300000, 300000, 300000]
-  restarts: [300000, 600000, 900000]
-  restart_weights: [0.99, 0.989, 0.988]
-  eta_min: 0
+  T_period: [30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000]
+  restarts: [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000, 390000, 420000, 450000]
+  restart_weights: [ 0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107, 0.2796, 0.2516, 0.2265]
+  eta_min: !!float 1e-7
 
   lr_gamma: 0.5
 
   pixel_criterion: cb   # l1 / cb
   pixel_weight: !!float 1e-3 # !!float 1e-2
   feature_criterion: cb # l1 / cb
-  feature_weight: !!float 1e-8
+  feature_weight: !!float 1e-5
+
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
-
   D_update_ratio: 1
   D_init_iters: 0
 

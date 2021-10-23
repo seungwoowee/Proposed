@@ -105,9 +105,9 @@ flow_args = flow_parser.parse_args()
 
 
 ### final model
-class DRB_no_unet(nn.Module):
+class DRBNet(nn.Module):
     def __init__(self, rgb_range, scale):
-        super(DRB_no_unet, self).__init__()
+        super(DRBNet, self).__init__()
 
         ### optical flow: GMA   ###################################
         self.GMA_model = torch.nn.DataParallel(RAFTGMA(flow_args))
@@ -130,27 +130,10 @@ class DRB_no_unet(nn.Module):
         feat = 256
         unit_feat = 64
 
-        self.feat0_0 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat0_1 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat0_2 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat0_3 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat0_4 = module_util.ConvModule(in_ch=3, out_ch=feat, kernel_size=3, stride=1, padding=1,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-
-        self.feat1_0 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat1_1 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat1_2 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat1_3 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat1_4 = module_util.ConvModule(in_ch=feat, out_ch=unit_feat, kernel_size=1, stride=1, padding=0,
-                                              bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat0 = module_util.ConvModule(in_ch=3 * 5, out_ch=feat * 5, kernel_size=3, stride=1, padding=1,
+                                            bias=use_bias, activation=use_act, norm=use_norm)
+        self.feat1 = module_util.ConvModule(in_ch=feat * 5, out_ch=unit_feat * 5, kernel_size=1, stride=1, padding=0,
+                                            bias=use_bias, activation=use_act, norm=use_norm)
 
         ch_reduction_ratio = 16
         block_n = 6
@@ -260,33 +243,25 @@ class DRB_no_unet(nn.Module):
         # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
         # test.show(12)  # 한번에 보일 이미지 개수
 
-        src_img = x[2]
-        x[0] = flow_cal_backwarp(src_img, x[0], self.GMA_model)
-        x[1] = flow_cal_backwarp(src_img, x[1], self.GMA_model)
-        x[3] = flow_cal_backwarp(src_img, x[3], self.GMA_model)
-        x[4] = flow_cal_backwarp(src_img, x[4], self.GMA_model)
-
         x[0] = self.sub_mean(x[0])
         x[1] = self.sub_mean(x[1])
         x[2] = self.sub_mean(x[2])
         x[3] = self.sub_mean(x[3])
         x[4] = self.sub_mean(x[4])
 
-        x[0] = self.feat1_0(self.feat0_0(x[0]))
-        x[1] = self.feat1_1(self.feat0_1(x[1]))
-        x[2] = self.feat1_2(self.feat0_2(x[2]))
-        x[3] = self.feat1_3(self.feat0_3(x[3]))
-        x[4] = self.feat1_4(self.feat0_4(x[4]))
+        src_img = x[2]
+        x[0] = flow_cal_backwarp(src_img, x[0], self.GMA_model)
+        x[1] = flow_cal_backwarp(src_img, x[1], self.GMA_model)
+        x[3] = flow_cal_backwarp(src_img, x[3], self.GMA_model)
+        x[4] = flow_cal_backwarp(src_img, x[4], self.GMA_model)
 
+        x = self.feat0(torch.cat((x[0], x[1], x[2], x[3], x[4]), 1))
+        x = self.feat1(x)
 
-        # x = self.feat0(torch.cat((x[0], x[1], x[2], x[3], x[4]), 1))
-        # x = self.feat1(x)
-        # x_split = []
-        # for t in range(x.size(0)):
-        #     tmp = torch.split(x[t], 64)
-        #     tmp = torch.stack(tmp)
-        #     for k in range(len(tmp)):
-        #         x_split.append(tmp[k].unsqueeze(0))
+        tmp = torch.split(x[0], 64)
+        x = []
+        for k in range(len(tmp)):
+            x.append(tmp[k].unsqueeze(0))
 
         out = self.dense_DRB(x)
 

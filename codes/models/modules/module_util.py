@@ -780,6 +780,43 @@ class ConvModule(nn.Module):
             return out
 
 
+# class DownUpModule(torch.nn.Module): # up 부분 고치기
+#     def __init__(self, inout_ch, kernel_size=3, stride=1, padding=1, bias=False, activation='prelu', norm=None,
+#                  block_n=1):
+#         super(DownUpModule, self).__init__()
+#         # conv first
+#         self.conv_first = ConvModule(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=1, stride=1,
+#                                      padding=0, bias=bias, activation=activation, norm=norm)
+#         # down & up & down
+#         self.conv1_1 = ConvModule(in_ch=inout_ch, out_ch=inout_ch, kernel_size=kernel_size, stride=stride,
+#                                   padding=padding, bias=bias, activation=activation, norm=norm)
+#         self.down1_2 = nn.MaxPool2d(2)
+#         self.up1_3 = PixelShufflePack(in_channels=inout_ch, scale=2)
+#         self.conv1_4 = ConvModule(in_ch=inout_ch, out_ch=inout_ch, kernel_size=kernel_size, stride=stride,
+#                                   padding=padding, bias=bias, activation=activation, norm=norm)
+#         self.down1_5 = nn.MaxPool2d(2)
+#
+#         # up & down & up
+#         self.up2_1 = PixelShufflePack(in_channels=inout_ch, scale=2)
+#         self.conv2_2 = ConvModule(in_ch=inout_ch, out_ch=inout_ch, kernel_size=kernel_size, stride=stride,
+#                                   padding=padding, bias=bias, activation=activation, norm=norm)
+#         self.down2_3 = nn.MaxPool2d(2)
+#         self.up2_4 = PixelShufflePack(in_channels=inout_ch, scale=2)
+#
+#     def forward(self, x):
+#         # down & up & down
+#         res = self.down1_2(self.conv1_1(x))
+#         out = self.up1_3(res)
+#         sub = self.down1_5(self.conv1_4(out - x)) + res
+#
+#         # up & down & up
+#         res = self.up2_1(sub)
+#         out = self.down2_3(self.conv2_2(res))
+#         out = self.up2_4(out - sub)
+#
+#         return out + res
+
+
 class DRB_Block(torch.nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False, activation='prelu',
                  use_norm=None):
@@ -830,6 +867,9 @@ class DRBModule(nn.Module):
         self.conv_out = nn.Conv2d(in_channels=inout_ch + inout_ch * block_n, out_channels=inout_ch, kernel_size=3,
                                   stride=1, padding=1, bias=False)
 
+        # self.down_up = DownUpModule(inout_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias, activation=act,
+        #                             norm=None, block_n=block_n)
+
     def forward(self, x):
         x1_0 = self.conv1_0(x[0])
         x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
@@ -854,5 +894,7 @@ class DRBModule(nn.Module):
         x[2] = torch.cat((out_2, x[2]), 1)
         x[3] = torch.cat((out_3, x[3]), 1)
         x[4] = torch.cat((out_4, x[4]), 1)
+
+        # x.append(out_2)
 
         return x
