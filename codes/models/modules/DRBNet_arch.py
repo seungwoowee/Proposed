@@ -132,15 +132,16 @@ class DRBNet(nn.Module):
 
         self.feat0 = module_util.ConvModule(in_ch=3 * 5, out_ch=feat * 5, kernel_size=3, stride=1, padding=1,
                                             bias=use_bias, activation=use_act, norm=use_norm)
-        self.feat1 = module_util.ConvModule(in_ch=feat * 5, out_ch=unit_feat * 5, kernel_size=1, stride=1, padding=0,
+        self.feat1 = module_util.ConvModule(in_ch=feat * 5, out_ch=unit_feat * 5, kernel_size=1, stride=1,
+                                            padding=0,
                                             bias=use_bias, activation=use_act, norm=use_norm)
 
         ch_reduction_ratio = 16
         block_n = 6
 
         module_DRB = [
-            module_util.DRBModule(inout_ch=unit_feat, ch_reduction_ratio=ch_reduction_ratio, bias=use_bias, act=use_act,
-                                  block_n=k + 1)
+            module_util.DRBModule(inout_ch=unit_feat, ch_reduction_ratio=ch_reduction_ratio, bias=use_bias,
+                                  act=use_act, block_n=k + 1)
             for k in range(block_n)]
 
         self.dense_DRB = nn.Sequential(*module_DRB)
@@ -157,92 +158,10 @@ class DRBNet(nn.Module):
 
         self.img_upsample_x4 = nn.Upsample(scale_factor=4, mode='bicubic', align_corners=False)
 
-    def forward(self, x):
-        # src_img = x[2]
-        #
-        # ref_img = x[0]
-        # x0_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
-        # x0_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[1]
-        # x1_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
-        # x1_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[3]
-        # x3_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
-        # x3_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[4]
-        # x4_warp = flow_cal_backwarp(src_img, ref_img, self.GMA_model)  # back warp
-        # x4_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        # test = util.ShowImage()
-        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
-        # test.append(x[0], x[1], x[3], x[4])
-        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
-        # test.show(12)  # 한번에 보일 이미지 개수
-        #
-        # ref_img = x[0]
-        # x0_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
-        # x0_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[1]
-        # x1_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
-        # x1_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[3]
-        # x3_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
-        # x3_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[4]
-        # x4_warp = flow_cal_backwarp(ref_img, src_img, self.GMA_model)  # back warp
-        # x4_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        # test = util.ShowImage()
-        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
-        # test.append(x[0], x[1], x[3], x[4])
-        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
-        # test.show(12)  # 한번에 보일 이미지 개수
-        #
-        # x0_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
-        # x0_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[1]
-        # x1_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
-        # x1_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[3]
-        # x3_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
-        # x3_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[4]
-        # x4_warp = flow_cal_backwarp2(src_img, ref_img, self.GMA_model)  # back warp
-        # x4_flow = flow_cal(src_img, ref_img, self.GMA_model)  # flow
-        # test = util.ShowImage()
-        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
-        # test.append(x[0], x[1], x[3], x[4])
-        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
-        # test.show(12)  # 한번에 보일 이미지 개수
-        #
-        # ref_img = x[0]
-        # x0_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
-        # x0_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[1]
-        # x1_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
-        # x1_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[3]
-        # x3_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
-        # x3_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        #
-        # ref_img = x[4]
-        # x4_warp = flow_cal_backwarp2(ref_img, src_img, self.GMA_model)  # back warp
-        # x4_flow = flow_cal(ref_img, src_img, self.GMA_model)  # flow
-        # test = util.ShowImage()
-        # test.append(x0_flow, x1_flow, x3_flow, x4_flow)
-        # test.append(x[0], x[1], x[3], x[4])
-        # test.append(x0_warp, x1_warp, x3_warp, x4_warp)
-        # test.show(12)  # 한번에 보일 이미지 개수
+        # self.down_up = module_util.DownUpModule(inout_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=use_bias, activation=act,
+        #                             norm=None, block_n=block_n)
 
+    def forward(self, x):
         x[0] = self.sub_mean(x[0])
         x[1] = self.sub_mean(x[1])
         x[2] = self.sub_mean(x[2])

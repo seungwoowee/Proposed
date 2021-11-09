@@ -98,12 +98,16 @@ if __name__ == "__main__":
     # restart_weights = [1]
     #
     # ## four
-    T_period= [30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000,
-               30000]
-    restarts= [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000, 390000,
-               420000, 450000]
-    restart_weights= [0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107,
-                      0.2796, 0.2516, 0.2265]
+    # T_period= [30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000,
+    #            30000]
+    # restarts= [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000, 390000,
+    #            420000, 450000]
+    # restart_weights= [0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107,
+    #                   0.2796, 0.2516, 0.2265]
+    T_period= [300000, 300000, 300000, 300000, 300000]
+    restarts= [300000, 600000, 900000, 1200000]
+    restart_weights= [1, 0.75, 0.675, 0.6075]
+
 
     scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
                                           weights=restart_weights)
@@ -111,7 +115,7 @@ if __name__ == "__main__":
     ##############################
     # Draw figure
     ##############################
-    N_iter = 450000
+    N_iter = 1199999
     lr_l = list(range(N_iter))
     for i in range(N_iter):
         scheduler.step()
@@ -129,8 +133,8 @@ if __name__ == "__main__":
     plt.figure(1)
     plt.subplot(111)
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-    plt.title('Title', fontsize=16, color='k')
-    plt.plot(list(range(N_iter)), lr_l, linewidth=1.5, label='learning rate scheme')
+    # plt.title('CosineAnnealing', fontsize=16, color='k')
+    plt.plot(list(range(N_iter)), lr_l, linewidth=1.5, label='learning rate')
     legend = plt.legend(loc='upper right', shadow=False)
     ax = plt.gca()
     labels = ax.get_xticks().tolist()

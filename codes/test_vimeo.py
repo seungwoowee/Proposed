@@ -15,7 +15,8 @@ def test():
     #### options
     parser = argparse.ArgumentParser()
     # parser.add_argument('-opt', type=str, default='options/test_EDSR_vimeo.yml', help='Path to option YMAL file.')
-    parser.add_argument('-opt', type=str, default='options/test_RCAN_vimeo.yml', help='Path to option YMAL file.')
+    # parser.add_argument('-opt', type=str, default='options/test_RCAN_vimeo.yml', help='Path to option YMAL file.')
+    parser.add_argument('-opt', type=str, default='options/test_vimeo.yml', help='Path to option YMAL file.')
 
     parser.add_argument('--gt_dir', type=str, default='D:/vimeo_septuplet/sequences')
     parser.add_argument('--lr_dir', type=str, default='D:/vimeo_septuplet/sequences_bicubic')
