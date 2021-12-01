@@ -5,6 +5,7 @@ import models.modules.SRResNet_arch as SRResNet_arch
 import models.modules.discriminator_vgg_arch as SRGAN_arch
 import models.modules.RRDBNet_arch as RRDBNet_arch
 import models.modules.DRBNet_arch as DRBNet_arch
+import models.modules.DRBNet_arch_3 as DRBNet_arch3
 import models.modules.RCAN_arch as RCAN_arch
 import models.modules.EDSR_arch as EDSR_arch
 import models.modules.DBPN_arch as DBPN_arch
@@ -70,6 +71,10 @@ def define_DRB(opt):
     which_model = opt_net['which_model_DRB']
     if which_model == 'DRB':
         net = DRBNet_arch.DRBNet(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB_tmp':
+        net = DRBNet_arch.DRBNet_tmp(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB_81':
+        net = DRBNet_arch3.DRBNet1(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net

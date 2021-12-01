@@ -17,6 +17,7 @@ def test():
     # parser.add_argument('-opt', type=str, default='options/test_EDSR.yml', help='Path to option YMAL file.')
     parser.add_argument('-opt', type=str, default='options/test_RCAN.yml', help='Path to option YMAL file.')
     # parser.add_argument('-opt', type=str, default='options/test_DBPN.yml', help='Path to option YMAL file.')
+    # parser.add_argument('-opt', type=str, default='options/test.yml', help='Path to option YMAL file.')
 
     opt = option.parse(parser.parse_args().opt, is_train=False)
     opt = option.dict_to_nonedict(opt)

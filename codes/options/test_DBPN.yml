@@ -31,8 +31,8 @@ network_DBPN:
 
 #### path
 path:
-  root: H:/Proposed              # written at option.py
-  pretrain_model: ../pretrained_model/DBPN-RES-MR64-3_4x.pth
+  root: ~             # written at option.py
+  pretrain_model: ../pretrained_model/DBPN_700001.pth
   strict_load: true
   results_root: ../results
 

@@ -69,9 +69,9 @@ if __name__ == "__main__":
     # MultiStepLR_Restart
     ##############################
     ## Original
-    # lr_steps = [200000, 400000, 600000, 800000]
-    # restarts = None
-    # restart_weights = None
+    lr_steps = [30000, 60000, 90000, 120000,150000,180000,210000,240000,270000,300000]
+    restarts = None
+    restart_weights = None
 
     ## two
     # lr_steps = [100000, 200000, 300000, 400000, 490000, 600000, 700000, 800000, 900000, 990000]
@@ -80,14 +80,14 @@ if __name__ == "__main__":
     #
     # ## four
     # lr_steps = [
-    #     50000, 100000, 150000, 200000, 240000, 300000, 350000, 400000, 450000, 490000, 550000,
+    #     30000, 100000, 150000, 200000, 240000, 300000, 350000, 400000, 450000, 490000, 550000,
     #     600000, 650000, 700000, 740000, 800000, 850000, 900000, 950000, 990000
     # ]
     # restarts = [250000, 500000, 750000]
     # restart_weights = [1, 1, 1]
-    #
-    # scheduler = MultiStepLR_Restart(optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
-    #                                 clear_state=False)
+
+    scheduler = MultiStepLR_Restart(optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
+                                    clear_state=False)
 
     ##############################
     # Cosine Annealing Restart
@@ -104,18 +104,18 @@ if __name__ == "__main__":
     #            420000, 450000]
     # restart_weights= [0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107,
     #                   0.2796, 0.2516, 0.2265]
-    T_period= [300000, 300000, 300000, 300000, 300000]
-    restarts= [300000, 600000, 900000, 1200000]
-    restart_weights= [1, 0.75, 0.675, 0.6075]
+    # T_period= [300000]
+    # restarts= 0
+    # restart_weights= 0
 
-
-    scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
-                                          weights=restart_weights)
+    #
+    # scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
+    #                                       weights=restart_weights)
 
     ##############################
     # Draw figure
     ##############################
-    N_iter = 1199999
+    N_iter = 300000
     lr_l = list(range(N_iter))
     for i in range(N_iter):
         scheduler.step()

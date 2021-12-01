@@ -43,6 +43,8 @@ def create_dataset(dataset_opt):
         from data.LQGT_DBPN import LQGTDataset as D
     elif mode == 'vimeo':
         from data.LQGT_vimeo import LQGTDataset as D
+    elif mode == 'vimeo_DRB':
+        from data.LQGT_vimeo_DRB import LQGTDataset as D
     # elif mode == 'LQGTseg_bg':
     #     from data.LQGT_seg_bg_dataset import LQGTSeg_BG_Dataset as D
     else:

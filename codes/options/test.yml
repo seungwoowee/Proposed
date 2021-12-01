@@ -1,46 +1,44 @@
-name: RCAN
-
-main_mode: VideoSR
-model: x4SR
-distortion: ~
+name: DRB_REDS
+model: DRB
+distortion: sr
 scale: 4
 gpu_ids: [ 0 ]
-position: ~  # mid / side_1st / side_2nd
+ref_frame_num: 5 # 3 / 5 / 7 ...
 
 datasets:
-  val_test:
-    scale: 4
-    name: RCAN
-    mode: LQGT
-    data_type: img
-#    dataroot_GT: D:/REDS/val_sharp # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
-#    dataroot_LQ: D:/REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
-    dataroot_GT: D:\DIV2K\DIV2K_train_HR
-    dataroot_LQ: D:\DIV2K\DIV2K_train_LR_bicubic\X4
+  val:
+    name: val
+    mode: DRB
+    dataroot_GT: ../../REDS/val_sharp # D:/REDS/val_sharp #../../../ntire20/DIV2K_valid_HR
+    dataroot_LR: ../../REDS/val_sharp_bicubic/X4 # D:/REDS/val_sharp_bicubic/X4 # ../../../ntire20/Corrupted-va-x
+    data_type: seq
+    position: mid # side_1st // side 2nd // mid
+    ref_frame_num: 5 # 3 / 5 / 7 ...
 
 
 #### network structures
-network_SR:
-  which_model: ~   # DRBNet_mid / DRBNet_side_1st / DRBNet_side_2nd
+network_G:
+  which_model_G: RRDBNet
+  in_nc: 3
+  out_nc: 3
+  nf: 64
+  nb: 23
+
+network_D:
+  which_model_D: discriminator_vgg_128
+  in_nc: 3
+  nf: 64
+
+network_DRB:
+  which_model_DRB: DRB
+  rgb_range: 1
 
 #### path
 path:
-  pretrain_model: ../pretrained_model/RCAN_BIX4.pt
+  root: H:/Proposed              # written at option.py
+  pretrain_model_DRB: ../pretrained_model/300000_G.pth
   strict_load: true
   results_root: ../results
 
-network_RCAN:
-  which_model_RCAN: RCAN
-  n_resgroups: 10
-  n_resblocks: 20
-  n_feats: 64
-  reduction: 16
-  scale: 4
-  rgb_range: 255
-  n_colors: 3
-  res_scale: 1
-  shift_mean: True
-  precision: single
-  gan_k: 1  # k value for adversarial loss
 
 

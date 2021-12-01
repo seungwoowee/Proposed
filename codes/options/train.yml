@@ -1,5 +1,6 @@
 #### general settings
-name: DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5
+name: DRB_GT_720_batch_1_block_n_2_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5
+http://localhost:16006/#scalars
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -57,9 +58,9 @@ network_DRB:
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5/models/930000_G.pth
+  pretrain_model_DRB: ~ #H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5/models/930000_G.pth
   strict_load: true
-  resume_state: H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5/training_state/930000.state
+  resume_state: ~ #H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5/training_state/930000.state
   root: H:/Proposed              # written at option.py
   #  experiment_root:  ~  # written at option.py
   #  test_root:  ~        # written at option.py
