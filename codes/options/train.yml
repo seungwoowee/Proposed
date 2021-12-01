@@ -1,5 +1,5 @@
 #### general settings
-name: test
+name: DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP30000
 
 use_tb_logger: true
 model: DRB
@@ -16,9 +16,9 @@ datasets:
     dataroot_GT: ../../REDS/train_sharp # ../datasets/DF2K/generated/tdsr/HR  # D:/REDS/sintel_GT
     dataroot_LR: ../../REDS/train_sharp_bicubic/X4 # ../datasets/DF2K/generated/tdsr/LR  # D:/REDS/sintel_LR
     use_shuffle: true
-    n_workers: 4  # per GPU
+    n_workers: 0  # per GPU
     batch_size: 1
-    GT_size: 512
+    GT_size: 720
     use_flip: true
     use_rot: true
     color: RGB
@@ -51,7 +51,7 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB_no_unet # DRB_mid // DRB_no_unet
+  which_model_DRB: DRB # DRB_mid // DRB_no_unet
   rgb_range: 1
 
 
@@ -97,10 +97,10 @@ train:
   #  # CosineAnnealingLR_Restart
   lr_scheme: CosineAnnealingLR_Restart
   # four
-  T_period: [300000, 300000, 300000, 300000]
-  restarts: [300000, 600000, 900000]
-  restart_weights: [0.99, 0.989, 0.988]
-  eta_min: 0
+  T_period: [30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000]
+  restarts: [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000, 390000, 420000, 450000]
+  restart_weights: [ 0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107, 0.2796, 0.2516, 0.2265]
+  eta_min: !!float 1e-7
 
   lr_gamma: 0.5
 
@@ -108,9 +108,9 @@ train:
   pixel_weight: !!float 1e-3 # !!float 1e-2
   feature_criterion: cb # l1 / cb
   feature_weight: !!float 1e-8
+
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
-
   D_update_ratio: 1
   D_init_iters: 0
 

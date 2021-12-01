@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-from utils import util  # 디버그용
 
 from models.modules.GMA_core.GMA_network import RAFTGMA
 from models.modules.GMA_core.GMA_utils.utils import InputPadder
@@ -105,9 +104,9 @@ flow_args = flow_parser.parse_args()
 
 
 ### final model
-class DRB_no_unet(nn.Module):
+class DRBNet(nn.Module):
     def __init__(self, rgb_range, scale):
-        super(DRB_no_unet, self).__init__()
+        super(DRBNet, self).__init__()
 
         ### optical flow: GMA   ###################################
         self.GMA_model = torch.nn.DataParallel(RAFTGMA(flow_args))
