@@ -90,8 +90,17 @@ def define_DRB(opt):
     which_model = opt_net['which_model_DRB']
     if which_model == 'DRB_mid':
         net = DRBNet_arch.DRBNet_mid()
-    elif which_model == 'DRB_nowarp':
-        net = DRBNet_arch.DRBNet_mid_nowarp()
+    elif which_model == 'DRB1':
+        net = DRBNet_arch.DRBNet1(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB2':
+        net = DRBNet_arch.DRBNet2(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB3':
+        net = DRBNet_arch.DRBNet3(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB4':
+        net = DRBNet_arch.DRBNet4(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB5':
+        net = DRBNet_arch.DRBNet5(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+        
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net

@@ -1,7 +1,9 @@
 #### general settings
-name: DRB_SR_GT_512_block_n_4_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_cb_1e-1_TP150000_x4
+name: DRB1_net_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_l1_1e-1_fea_l1_1e-6_Multistep_40000_min_1e-7
+# pix_l1_1e-1 l2_1e-1 cb_1e-3
+# fea_l1_1e-6 l2_1e-6 cb_1e-8
 use_tb_logger: true
-model: DRB_nowarp
+model: DRB
 distortion: sr
 scale: 4
 gpu_ids: [0]
@@ -13,12 +15,12 @@ datasets:
     mode: DRB # DRB / DRB_no_patch
     aug: ~ #noise
     noise_data: ../datasets/DF2K/Corrupted_noise/
-    dataroot_GT: ../../../datasets/REDS_jpg/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
-    dataroot_LR: ../../../datasets/REDS_jpg/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
+    dataroot_GT: ../../REDS/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
+    dataroot_LR: ../../REDS/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
     n_workers: 0  # per GPU
-    batch_size: 8
-    GT_size: 512
+    batch_size: 1
+    GT_size: 720
     use_flip: true
     use_rot: true
     color: RGB
@@ -28,8 +30,8 @@ datasets:
   val:
     name: val
     mode: DRB
-    dataroot_GT: ../../../datasets/REDS_jpg/val_sharp/ #../../../ntire20/DIV2K_valid_HR
-    dataroot_LR: ../../../datasets/REDS_jpg/val_sharp_bicubic/X4/ # ../../../ntire20/Corrupted-va-x
+    dataroot_GT: ../../REDS/val_sharp/ #../../../ntire20/DIV2K_valid_HR
+    dataroot_LR: ../../REDS/val_sharp_bicubic/X4/ # ../../../ntire20/Corrupted-va-x
     data_type: seq
     position: mid # side_1st // side 2nd // mid
     ref_frame_num: 5 # 3 / 5 / 7 ...
@@ -48,14 +50,15 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB_mid # DRB_1st // DRB_2nd
+  which_model_DRB: DRB4
+  rgb_range: 1
 
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_cb_1e-1_TP150000_x4/models/35000_G.pth
+  pretrain_model_DRB: ~ #../experiments/DRB2_net_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_Multistep_40000_min_1e-7/models/10000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB_SR_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1_cri_fea_cb_1e-1_TP150000_x4/training_state/35000.state
+  resume_state: ~ #../experiments/DRB2_net_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_Multistep_40000_min_1e-7/training_state/10000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -74,32 +77,42 @@ train:
   beta1_DRB: 0.9
   beta2_DRB: 0.999
 
-  niter: 600001
+  niter: 1200001
   warmup_iter: -1  # no warm up
 
-  #  # MultiStepLR_Restart
-  #  lr_scheme: MultiStepLR_Restart
-  #  lr_steps: [50000, 100000, 200000, 300000]
-  #  restarts: [250000, 500000, 750000]
-  #  restart_weights: [1, 1, 1]
+#  # MultiStepLR_Restart
+#  lr_scheme: MultiStepLR_Restart
+#  lr_steps: [40000, 80000, 120000, 160000, 200000, 240000, 280000, 320000]
+#  restarts: ~
+#  restart_weights: ~
+
+  # CosineAnnealingLR_Restart
+#  lr_scheme: CosineAnnealingLR_Restart
+#  # four
+#  T_period: [30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000]
+#  restarts: [30000, 60000, 90000, 120000, 150000, 180000, 210000, 240000, 270000, 300000, 330000, 360000, 390000, 420000, 450000]
+#  restart_weights: [ 0.99, 0.891, 0.8019, 0.7217, 0.6495, 0.5846, 0.5261, 0.4735, 0.4262, 0.3835, 0.3452, 0.3107, 0.2796, 0.2516, 0.2265]
+#  eta_min: !!float 1e-7
 
   #  # CosineAnnealingLR_Restart
   lr_scheme: CosineAnnealingLR_Restart
   # four
-  T_period: [150000, 150000, 150000, 150000]
-  restarts: [150000, 300000, 450000]
-  restart_weights: [1, 1, 1]
-  eta_min: 0
-  eta_min: 0
+  T_period: [300000, 300000, 300000, 300000, 300000]
+  restarts: [300000, 600000, 900000, 1200000]
+  restart_weights: [1, 0.75, 0.675, 0.6075]
+  eta_min: !!float 1e-7
 
   lr_gamma: 0.5
 
-  pixel_criterion: cb   # l1 / cb
-  pixel_weight: 1 # !!float 1e-2
-  feature_criterion: cb # l1 / cb
-  feature_weight: !!float 1e-1
+  pixel_criterion: l1   # l1 / cb
+  pixel_weight: !!float 1e-1 # !!float 1e-2
+  feature_criterion: l1 # l1 / cb
+  feature_weight: !!float 1e-6
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
+
+  # pix_l1_1e-1 l2_1e-1 cb_1e-3
+  # fea_l1_1e-6 l2_1e-6 cb_1e-8
 
   D_update_ratio: 1
   D_init_iters: 0
@@ -110,8 +123,8 @@ train:
 #### logger
 ## tensorboard --logdir ./tb_logger --port=6006
 logger:
-  print_freq: 100
-  save_checkpoint_freq: !!float 5e3
+  print_freq: 500
+  save_checkpoint_freq: !!float 1e4
 
 
 # server ssh
@@ -123,8 +136,8 @@ logger:
 # server tensor board
 # PC: ssh -L 16006:localhost:6006 icsp@166.104.36.34
 # server:
-#  conda activate Proposed
-#  tensorboard --logdir sda/VSR/Proposed/tb_logger
-#  cd sda/VSR/Proposed/codes
+#  conda activate Dissertation
+#  tensorboard --logdir nvme1/Dissertation/tb_logger
+#  cd nvme1/Dissertation/codes
 
 
