@@ -1,6 +1,15 @@
 #### general settings
-name: DRB_GT_720_batch_1_block_n_2_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5
-http://localhost:16006/#scalars
+name: DRB9_2_net_GT_720_batch_1_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_l1_1e-2_TP300000_x5_min_1e-7
+# pix fea
+# l1  l1   1e-1 1e-6
+# l1  l2   1e-1 1e-6
+# l1  cb   1e-1 1e-12
+# l2  l1   1e-1 1e-7
+# l2  l2   1e-1 1e-7
+# l2  cb   1e-1 1e-13
+# cb  l1   1e-3 1e-2
+# cb  l2   1e-3 1e-2
+# cb  cb   1e-3 1e-8
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -51,16 +60,16 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB
+  which_model_DRB: DRB9_2
   rgb_range: 1
 
 
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5/models/930000_G.pth
+  pretrain_model_DRB: H:/Proposed/experiments/DRB9_2_net_GT_720_batch_1_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_l1_1e-2_TP300000_x5_min_1e-7/models/190000_G.pth
   strict_load: true
-  resume_state: ~ #H:/Proposed/experiments/DRB_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_TP300000_x5/training_state/930000.state
+  resume_state: H:/Proposed/experiments/DRB9_2_net_GT_720_batch_1_block_n_1_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_l1_1e-2_TP300000_x5_min_1e-7/training_state/190000.state
   root: H:/Proposed              # written at option.py
   #  experiment_root:  ~  # written at option.py
   #  test_root:  ~        # written at option.py
@@ -113,8 +122,18 @@ train:
 
   pixel_criterion: cb   # l1 / cb
   pixel_weight: !!float 1e-3 # !!float 1e-2
-  feature_criterion: cb # l1 / cb
-  feature_weight: !!float 1e-8
+  feature_criterion: l1 # l1 / cb
+  feature_weight: !!float 1e-2
+  # pix fea
+  # l1  l1   1e-1 1e-6
+  # l1  l2   1e-1 1e-6
+  # l1  cb   1e-1 1e-12
+  # l2  l1   1e-1 1e-7
+  # l2  l2   1e-1 1e-7
+  # l2  cb   1e-1 1e-13
+  # cb  l1   1e-3 1e-2
+  # cb  l2   1e-3 1e-2
+  # cb  cb   1e-3 1e-8
 
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
@@ -122,10 +141,10 @@ train:
   D_init_iters: 0
 
   manual_seed: 10
-  val_freq: !!float 1e4
+  val_freq: !!float 6e4
 
 #### logger
 ## tensorboard --logdir ./tb_logger --port=6006
 logger:
-  print_freq: 100
+  print_freq: 500
   save_checkpoint_freq: !!float 1e4

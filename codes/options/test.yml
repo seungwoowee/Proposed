@@ -30,13 +30,13 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB
+  which_model_DRB: DRB9_2
   rgb_range: 1
 
 #### path
 path:
   root: H:/Proposed              # written at option.py
-  pretrain_model_DRB: ../pretrained_model/300000_G.pth
+  pretrain_model_DRB: ../pretrained_model/10000_G.pth
   strict_load: true
   results_root: ../results
 

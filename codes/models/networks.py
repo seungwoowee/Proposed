@@ -5,7 +5,6 @@ import models.modules.SRResNet_arch as SRResNet_arch
 import models.modules.discriminator_vgg_arch as SRGAN_arch
 import models.modules.RRDBNet_arch as RRDBNet_arch
 import models.modules.DRBNet_arch as DRBNet_arch
-import models.modules.DRBNet_arch_3 as DRBNet_arch3
 import models.modules.RCAN_arch as RCAN_arch
 import models.modules.EDSR_arch as EDSR_arch
 import models.modules.DBPN_arch as DBPN_arch
@@ -69,12 +68,33 @@ def define_F(opt, use_bn=False):
 def define_DRB(opt):
     opt_net = opt['network_DRB']
     which_model = opt_net['which_model_DRB']
-    if which_model == 'DRB':
-        net = DRBNet_arch.DRBNet(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
-    elif which_model == 'DRB_tmp':
-        net = DRBNet_arch.DRBNet_tmp(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
-    elif which_model == 'DRB_81':
-        net = DRBNet_arch3.DRBNet1(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    if which_model == 'DRB1':
+        net = DRBNet_arch.DRBNet1(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB2':
+        net = DRBNet_arch.DRBNet2(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB3':
+        net = DRBNet_arch.DRBNet3(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB4':
+        net = DRBNet_arch.DRBNet4(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB5':
+        net = DRBNet_arch.DRBNet5(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB6':
+        net = DRBNet_arch.DRBNet6(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB7':
+        net = DRBNet_arch.DRBNet7(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB8':
+        net = DRBNet_arch.DRBNet8(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9':
+        net = DRBNet_arch.DRBNet9(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_1':
+        net = DRBNet_arch.DRBNet9_1(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_2':
+        net = DRBNet_arch.DRBNet9_2(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_3':
+        net = DRBNet_arch.DRBNet9_3(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB_test':
+        net = DRBNet_arch.DRBtest(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net
