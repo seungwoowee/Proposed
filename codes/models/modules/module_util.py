@@ -780,7 +780,7 @@ class ConvModule(nn.Module):
             return out
 
 
-# class DownUpModule(torch.nn.Module):
+# class DownUpModule(torch.nn.Module): # up 부분 고치기
 #     def __init__(self, inout_ch, kernel_size=3, stride=1, padding=1, bias=False, activation='prelu', norm=None,
 #                  block_n=1):
 #         super(DownUpModule, self).__init__()
@@ -855,6 +855,53 @@ class DRB_Block2(torch.nn.Module):
         # down & down & up
         out = self.down1(self.conv1(x))
         out = self.up1(out)
+        out = self.conv2(torch.cat((x, out), 1))
+        return out
+
+
+class DRB_Block3(torch.nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False, activation='prelu',
+                 use_norm=None):
+        super(DRB_Block3, self).__init__()
+        # down & up & down
+        self.conv1 = ConvModule(in_ch=in_ch, out_ch=4 * out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+        self.down1 = nn.MaxPool2d(2)
+
+        # self.up1 = DeconvBlock(input_size=4 * out_ch, output_size=out_ch, kernel_size=kernel_size,
+        #                        stride=2, padding=1, bias=bias, activation=activation, norm=use_norm)
+        self.up1 = nn.ConvTranspose2d(4 * out_ch, out_ch, 3, stride=2, padding=1, bias=bias)
+
+        self.conv2 = ConvModule(in_ch=in_ch + out_ch, out_ch=out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+
+    def forward(self, x):
+        # down & down & up
+        out = self.down1(self.conv1(x))
+
+        out = self.up1(out, output_size=x.size())
+        out = self.conv2(torch.cat((x, out), 1))
+        return out
+
+
+class DRB_Block4(torch.nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False, activation='prelu',
+                 use_norm=None):
+        super(DRB_Block4, self).__init__()
+        self.conv1 = ConvModule(in_ch=in_ch, out_ch=in_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+        self.down1 = nn.MaxPool2d(2)
+
+        # self.up1 = DeconvBlock(input_size=4 * out_ch, output_size=out_ch, kernel_size=kernel_size,
+        #                        stride=2, padding=1, bias=bias, activation=activation, norm=use_norm)
+        self.up1 = nn.ConvTranspose2d(in_ch, out_ch, 3, stride=2, padding=1, bias=bias)
+
+        self.conv2 = ConvModule(in_ch=in_ch + out_ch, out_ch=out_ch, kernel_size=kernel_size, stride=stride,
+                                padding=padding, bias=bias, activation=activation, norm=use_norm)
+
+    def forward(self, x):
+        out = self.down1(self.conv1(x))
+        out = self.up1(out, output_size=x.size())
         out = self.conv2(torch.cat((x, out), 1))
         return out
 
@@ -934,24 +981,26 @@ class DRBModule2(nn.Module):
         self.conv2_2 = DRB_Block2(in_ch=5 * inout_ch, out_ch=5 * inout_ch, kernel_size=3, stride=1, padding=1,
                                   bias=bias, activation=act, use_norm=None)
 
-        self.conv_out0 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
-                                  bias=bias, activation=act, use_norm=None)
-        self.conv_out1 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
-                                  bias=bias, activation=act, use_norm=None)
-        self.conv_out2 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
-                                  bias=bias, activation=act, use_norm=None)
-        self.conv_out3 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
-                                  bias=bias, activation=act, use_norm=None)
-        self.conv_out4 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
-                                  bias=bias, activation=act, use_norm=None)
+        self.conv_out0 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
         self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
         self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
         self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
         self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
         self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
-
-
-
 
     def forward(self, x):
         x1_0 = self.conv1_0(x[0])
@@ -971,6 +1020,499 @@ class DRBModule2(nn.Module):
         out_2 = self.CA2(self.conv_out2(torch.cat((x[2], x_out[2]), 1)))
         out_3 = self.CA3(self.conv_out3(torch.cat((x[3], x_out[3]), 1)))
         out_4 = self.CA4(self.conv_out4(torch.cat((x[4], x_out[4]), 1)))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        # x.append(out_2)
+
+        return x
+
+
+class DRBModule4(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule4, self).__init__()
+        self.inout_ch = inout_ch
+        self.conv1_0 = DRB_Block2(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block2(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block2(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        out_0 = self.CA0(self.conv_out0(torch.cat((x[0], x1_0), 1)))
+        out_1 = self.CA1(self.conv_out1(torch.cat((x[1], x1_1), 1)))
+        out_2 = self.CA2(self.conv_out2(torch.cat((x[2], x1_2), 1)))
+        out_3 = self.CA3(self.conv_out3(torch.cat((x[3], x1_3), 1)))
+        out_4 = self.CA4(self.conv_out4(torch.cat((x[4], x1_4), 1)))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        # x.append(out_2)
+
+        return x
+
+
+class DRBModule5(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule5, self).__init__()
+        self.conv1_0 = DRB_Block2(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block2(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block2(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block2(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv2_1 = DRB_Block2(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+        self.conv2_2 = DRB_Block2(in_ch=5 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+        self.conv2_3 = DRB_Block2(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+
+        self.conv3_2 = DRB_Block2(in_ch=3 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block2(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block2(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block2(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block2(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block2(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        x2_1 = self.conv2_1(torch.cat((x1_0, x1_1), 1))
+        x2_3 = self.conv2_3(torch.cat((x1_4, x1_3), 1))
+        x2_2 = self.conv2_2(torch.cat((x1_1, x1_2, x1_3, x2_1, x2_3), 1))
+
+        x3_2 = self.conv3_2(torch.cat((x2_1, x2_2, x2_3), 1))
+
+        out_0 = self.CA0(self.conv_out0(x1_0))
+        out_1 = self.CA1(self.conv_out1(x2_1))
+        out_2 = self.CA2(self.conv_out2(x3_2))
+        out_3 = self.CA3(self.conv_out3(x2_3))
+        out_4 = self.CA4(self.conv_out4(x1_4))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        return x
+
+
+class DRBModule6(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule6, self).__init__()
+        self.conv1_0 = DRB_Block1(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block1(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block1(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block1(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block1(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv2_1 = DRB_Block1(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+        self.conv2_2 = DRB_Block1(in_ch=5 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+        self.conv2_3 = DRB_Block1(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+
+        self.conv3_2 = DRB_Block1(in_ch=3 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block1(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block1(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block1(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block1(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block1(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        x2_1 = self.conv2_1(torch.cat((x1_0, x1_1), 1))
+        x2_3 = self.conv2_3(torch.cat((x1_4, x1_3), 1))
+        x2_2 = self.conv2_2(torch.cat((x1_1, x1_2, x1_3, x2_1, x2_3), 1))
+
+        x3_2 = self.conv3_2(torch.cat((x2_1, x2_2, x2_3), 1))
+
+        out_0 = self.CA0(self.conv_out0(x1_0))
+        out_1 = self.CA1(self.conv_out1(x2_1))
+        out_2 = self.CA2(self.conv_out2(x3_2))
+        out_3 = self.CA3(self.conv_out3(x2_3))
+        out_4 = self.CA4(self.conv_out4(x1_4))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        return x
+
+
+class DRBModule7(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule7, self).__init__()
+        self.conv1_0 = DRB_Block3(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block3(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block3(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block3(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block3(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv2_1 = DRB_Block3(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+        self.conv2_2 = DRB_Block3(in_ch=5 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+        self.conv2_3 = DRB_Block3(in_ch=2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+
+        self.conv3_2 = DRB_Block3(in_ch=3 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1, bias=bias,
+                                  activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        x2_1 = self.conv2_1(torch.cat((x1_0, x1_1), 1))
+        x2_3 = self.conv2_3(torch.cat((x1_4, x1_3), 1))
+        x2_2 = self.conv2_2(torch.cat((x1_1, x1_2, x1_3, x2_1, x2_3), 1))
+
+        x3_2 = self.conv3_2(torch.cat((x2_1, x2_2, x2_3), 1))
+
+        out_0 = self.CA0(self.conv_out0(x1_0))
+        out_1 = self.CA1(self.conv_out1(x2_1))
+        out_2 = self.CA2(self.conv_out2(x3_2))
+        out_3 = self.CA3(self.conv_out3(x2_3))
+        out_4 = self.CA4(self.conv_out4(x1_4))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        return x
+
+
+class DRBModule8(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule8, self).__init__()
+        self.conv1_0 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block3(in_ch=3 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block3(in_ch=inout_ch * block_n + 4 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block3(in_ch=3 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block3(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[0], x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[4], x[3]), 1))
+
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[1], x[2], x[3]), 1))
+
+        x[0] = self.CA0(self.conv_out0(x1_0))
+        x[1] = self.CA1(self.conv_out1(x1_1))
+        out_2 = self.CA2(self.conv_out2(x1_2))
+        x[3] = self.CA3(self.conv_out3(x1_3))
+        x[4] = self.CA4(self.conv_out4(x1_4))
+
+        x[2] = torch.cat((out_2, x[2]), 1)
+
+        return x
+
+
+class DRBModule9(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule9, self).__init__()
+        self.inout_ch = inout_ch
+        self.conv1_0 = DRB_Block4(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block4(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block4(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        out_0 = self.CA0(self.conv_out0(torch.cat((x[0], x1_0), 1)))
+        out_1 = self.CA1(self.conv_out1(torch.cat((x[1], x1_1), 1)))
+        out_2 = self.CA2(self.conv_out2(torch.cat((x[2], x1_2), 1)))
+        out_3 = self.CA3(self.conv_out3(torch.cat((x[3], x1_3), 1)))
+        out_4 = self.CA4(self.conv_out4(torch.cat((x[4], x1_4), 1)))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        # x.append(out_2)
+
+        return x
+
+
+class DRBModule9_1(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule9_1, self).__init__()
+        self.inout_ch = inout_ch
+        self.conv1_0 = DRB_Block4(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block4(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block4(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block4(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block4(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block4(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block4(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block4(in_ch=inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        out_0 = self.CA0(self.conv_out0(x1_0))
+        out_1 = self.CA1(self.conv_out1(x1_1))
+        out_2 = self.CA2(self.conv_out2(x1_2))
+        out_3 = self.CA3(self.conv_out3(x1_3))
+        out_4 = self.CA4(self.conv_out4(x1_4))
+
+        x[0] = torch.cat((out_0, x[0]), 1)
+        x[1] = torch.cat((out_1, x[1]), 1)
+        x[2] = torch.cat((out_2, x[2]), 1)
+        x[3] = torch.cat((out_3, x[3]), 1)
+        x[4] = torch.cat((out_4, x[4]), 1)
+
+        # x.append(out_2)
+
+        return x
+
+
+class DRBModule9_2(nn.Module):
+    def __init__(self, inout_ch, ch_reduction_ratio, bias, act, block_n):
+        super(DRBModule9_2, self).__init__()
+        self.inout_ch = inout_ch
+        self.conv1_0 = DRB_Block4(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+        self.conv1_1 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_2 = DRB_Block4(in_ch=inout_ch * block_n + 2 * inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_3 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                  padding=1, bias=bias, activation=act, use_norm=None)
+        self.conv1_4 = DRB_Block4(in_ch=inout_ch * block_n, out_ch=inout_ch, kernel_size=3, stride=1, padding=1,
+                                  bias=bias, activation=act, use_norm=None)
+
+        self.conv_out0 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out1 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out2 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out3 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.conv_out4 = DRB_Block4(in_ch=inout_ch * block_n + inout_ch, out_ch=inout_ch, kernel_size=3, stride=1,
+                                    padding=1,
+                                    bias=bias, activation=act, use_norm=None)
+        self.CA0 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA1 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA2 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA3 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+        self.CA4 = CALayer(inout_ch=inout_ch, ch_reduction_ratio=ch_reduction_ratio)
+
+    def forward(self, x):
+        x1_0 = self.conv1_0(x[0])
+        x1_1 = self.conv1_1(torch.cat((x1_0, x[1]), 1))
+        x1_4 = self.conv1_4(x[4])
+        x1_3 = self.conv1_3(torch.cat((x1_4, x[3]), 1))
+        x1_2 = self.conv1_2(torch.cat((x1_1, x1_3, x[2]), 1))
+
+        out_0 = self.CA0(self.conv_out0(torch.cat((x[0], x1_0), 1)))
+        out_1 = self.CA1(self.conv_out1(torch.cat((x[1], x1_1), 1)))
+        out_2 = self.CA2(self.conv_out2(torch.cat((x[2], x1_2), 1)))
+        out_3 = self.CA3(self.conv_out3(torch.cat((x[3], x1_3), 1)))
+        out_4 = self.CA4(self.conv_out4(torch.cat((x[4], x1_4), 1)))
 
         x[0] = torch.cat((out_0, x[0]), 1)
         x[1] = torch.cat((out_1, x[1]), 1)

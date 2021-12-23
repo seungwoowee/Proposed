@@ -1,7 +1,15 @@
 #### general settings
-name: DRB1_net_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_l1_1e-1_fea_l1_1e-6_Multistep_40000_min_1e-7
-# pix_l1_1e-1 l2_1e-1 cb_1e-3
-# fea_l1_1e-6 l2_1e-6 cb_1e-8
+name: DRB9_2_net_GT_720_batch_1_block_n_2_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_l1_1e-2_TP300000_x5_min_1e-7
+# pix fea
+# l1  l1   1e-1 1e-6
+# l1  l2   1e-1 1e-6
+# l1  cb   1e-1 1e-12
+# l2  l1   1e-1 1e-7
+# l2  l2   1e-1 1e-7
+# l2  cb   1e-1 1e-13
+# cb  l1   1e-3 1e-2
+# cb  l2   1e-3 1e-2
+# cb  cb   1e-3 1e-8
 use_tb_logger: true
 model: DRB
 distortion: sr
@@ -18,7 +26,7 @@ datasets:
     dataroot_GT: ../../REDS/train_sharp/ # ../datasets/DF2K/generated/tdsr/HR
     dataroot_LR: ../../REDS/train_sharp_bicubic/X4/ # ../datasets/DF2K/generated/tdsr/LR
     use_shuffle: true
-    n_workers: 0  # per GPU
+    n_workers: 4  # per GPU
     batch_size: 1
     GT_size: 720
     use_flip: true
@@ -50,15 +58,15 @@ network_D:
   nf: 64
 
 network_DRB:
-  which_model_DRB: DRB4
+  which_model_DRB: DRB9_2_block2
   rgb_range: 1
 
 #### path
 path:
   pretrain_model_G: ../pretrained_model/RRDB_PSNR_x4.pth
-  pretrain_model_DRB: ~ #../experiments/DRB2_net_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_Multistep_40000_min_1e-7/models/10000_G.pth
+  pretrain_model_DRB: ~ #../experiments/n/models/10000_G.pth
   strict_load: true
-  resume_state: ~ #../experiments/DRB2_net_GT_720_batch_1_block_n_6_lrDRB_1e-4_pixelShuffle_pix_cb_1e-3_fea_cb_1e-8_Multistep_40000_min_1e-7/training_state/10000.state
+  resume_state: ~ #../experiments/n/training_state/10000.state
 
 #### training settings: learning rate scheme, loss
 train:
@@ -104,21 +112,29 @@ train:
 
   lr_gamma: 0.5
 
-  pixel_criterion: l1   # l1 / cb
-  pixel_weight: !!float 1e-1 # !!float 1e-2
+  pixel_criterion: cb   # l1 / cb
+  pixel_weight: !!float 1e-3 # !!float 1e-2
   feature_criterion: l1 # l1 / cb
-  feature_weight: !!float 1e-6
+  feature_weight: !!float 1e-2
   gan_type: ragan  # gan | ragan
   gan_weight: !!float 5e-3
 
-  # pix_l1_1e-1 l2_1e-1 cb_1e-3
-  # fea_l1_1e-6 l2_1e-6 cb_1e-8
+# pix fea
+# l1  l1   1e-1 1e-6
+# l1  l2   1e-1 1e-6
+# l1  cb   1e-1 1e-12
+# l2  l1   1e-1 1e-7
+# l2  l2   1e-1 1e-7
+# l2  cb   1e-1 1e-13
+# cb  l1   1e-3 1e-2
+# cb  l2   1e-3 1e-2
+# cb  cb   1e-3 1e-8
 
   D_update_ratio: 1
   D_init_iters: 0
 
   manual_seed: 10
-  val_freq: !!float 1e4
+  val_freq: !!float 6e4
 
 #### logger
 ## tensorboard --logdir ./tb_logger --port=6006

@@ -197,12 +197,12 @@ def main():
                 idx = 0
                 for val_data in val_loader:
                     idx += 1
-                    if opt['datasets']['val']['position'] == 'mid':
-                        file_idx = 2
-                    elif opt['datasets']['val']['position'] == 'side_2nd':
-                        file_idx = 1
-                    elif opt['datasets']['val']['position'] == 'side_1st':
-                        file_idx = 0
+                    # if opt['datasets']['val']['position'] == 'mid':
+                    #     file_idx = 2
+                    # elif opt['datasets']['val']['position'] == 'side_2nd':
+                    #     file_idx = 1
+                    # elif opt['datasets']['val']['position'] == 'side_1st':
+                    #     file_idx = 0
 
                     model.feed_data(val_data)
                     model.test()

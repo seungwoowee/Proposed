@@ -100,7 +100,22 @@ def define_DRB(opt):
         net = DRBNet_arch.DRBNet4(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
     elif which_model == 'DRB5':
         net = DRBNet_arch.DRBNet5(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
-        
+    elif which_model == 'DRB6':
+        net = DRBNet_arch.DRBNet6(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB7':
+        net = DRBNet_arch.DRBNet7(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB8':
+        net = DRBNet_arch.DRBNet8(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9':
+        net = DRBNet_arch.DRBNet9(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_1':
+        net = DRBNet_arch.DRBNet9_1(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_2':
+        net = DRBNet_arch.DRBNet9_2(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_2_block2':
+        net = DRBNet_arch.DRBNet9_2_b2(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
+    elif which_model == 'DRB9_2_block4':
+        net = DRBNet_arch.DRBNet9_2_b4(rgb_range=opt_net['rgb_range'], scale=opt['scale'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     return net

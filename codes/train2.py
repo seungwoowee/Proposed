@@ -183,24 +183,26 @@ def main():
                 sr_img = sr_img / 255.
                 gt_img = gt_img / 255.
                 cur_psnr = util.calculate_psnr(sr_img * 255, gt_img * 255)
-                message += '{:s}: {:.4e} '.format('cur_psnr', cur_psnr)
+                cur_ssim = util.calculate_ssim(sr_img * 255, gt_img * 255)
+                message += '{:s}: {:.4e} {:s}: {:.4e} '.format('cur_psnr', cur_psnr, 'cur_ssim', cur_ssim)
                 tb_logger.add_scalar('cur_psnr', cur_psnr, current_step)
+                tb_logger.add_scalar('cur_ssim', cur_ssim, current_step)
 
                 if rank <= 0:
                     logger.info(message)
 
             # validation
             if current_step % opt['train']['val_freq'] == 0 and rank <= 0 and val_loader is not None:
-                avg_psnr = val_pix_err_f = val_pix_err_nf = val_mean_color_err = 0.0
+                avg_psnr = avg_ssim = 0.0
                 idx = 0
                 for val_data in val_loader:
                     idx += 1
-                    if opt['datasets']['val']['position'] == 'mid':
-                        file_idx = 2
-                    elif opt['datasets']['val']['position'] == 'side_2nd':
-                        file_idx = 1
-                    elif opt['datasets']['val']['position'] == 'side_1st':
-                        file_idx = 0
+                    # if opt['datasets']['val']['position'] == 'mid':
+                    #     file_idx = 2
+                    # elif opt['datasets']['val']['position'] == 'side_2nd':
+                    #     file_idx = 1
+                    # elif opt['datasets']['val']['position'] == 'side_1st':
+                    #     file_idx = 0
 
                     model.feed_data(val_data)
                     model.test()
@@ -230,20 +232,23 @@ def main():
                     cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
+                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
 
                 avg_psnr = avg_psnr / idx
+                avg_ssim = avg_ssim / idx
                 # val_pix_err_f /= idx
                 # val_pix_err_nf /= idx
                 # val_mean_color_err /= idx
 
                 # log
-                logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
+                logger.info('# Validation # PSNR: {:.4e} # SSIM: {:.4e}'.format(avg_psnr, avg_ssim))
                 logger_val = logging.getLogger('val')  # validation logger
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
-                    epoch, current_step, avg_psnr))
+                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e} ssim: {:.4e}'.format(
+                    epoch, current_step, avg_psnr, avg_ssim))
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
+                    tb_logger.add_scalar('ssim', avg_ssim, current_step)
                     # tb_logger.add_scalar('val_pix_err_f', val_pix_err_f, current_step)
                     # tb_logger.add_scalar('val_pix_err_nf', val_pix_err_nf, current_step)
                     # tb_logger.add_scalar('val_mean_color_err', val_mean_color_err, current_step)
